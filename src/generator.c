@@ -1,0 +1,486 @@
+#include "quadlet-config.h"
+
+#include <glib-object.h>
+#include <unitfile.h>
+#include <utils.h>
+
+
+#define UNIT_GROUP "Unit"
+#define SERVICE_GROUP "Service"
+#define CONTAINER_GROUP "Container"
+#define X_CONTAINER_GROUP "X-Container"
+#define VOLUME_GROUP "Volume"
+#define X_VOLUME_GROUP "X-Volume"
+
+static void
+parse_env_val (GHashTable *out,
+               const char *env_val)
+{
+  char *eq = strchr (env_val, '=');
+  if (eq != NULL)
+    g_hash_table_insert (out, g_strndup (env_val, eq - env_val), g_strdup (eq+1));
+  else
+    quad_log ("Invalid environment assignment '%s'", env_val);
+}
+
+static GHashTable *
+parse_env_keys (char **environments)
+{
+  GHashTable *res = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
+  for (int i = 0 ; environments[i] != NULL; i++)
+    {
+      g_autoptr(GPtrArray) assigns = quad_split_string (environments[i], WHITESPACE, QUAD_SPLIT_RELAX|QUAD_SPLIT_UNQUOTE|QUAD_SPLIT_CUNESCAPE);
+      for (guint j = 0; j < assigns->len; j++)
+        parse_env_val (res, g_ptr_array_index (assigns, j));
+    }
+  return res;
+}
+
+static int
+cmpstringp (const void *p1, const void *p2)
+{
+  return strcmp (*(char * const *) p1, *(char * const *) p2);
+}
+
+static void
+add_id_map (GPtrArray *podman_args,
+            const char *arg_prefix,
+            long container_id_start,
+            long host_id_start,
+            long num_ids,
+            long reserved_container_id)
+{
+  long num_before = num_ids;
+  long num_after = 0;
+
+  if (reserved_container_id >= container_id_start &&
+      reserved_container_id < container_id_start + num_ids)
+    {
+      /* reserved_container_id is in the middle, so we need to split the range */
+      num_before = reserved_container_id - container_id_start;
+      num_after = num_ids - num_before;
+    }
+
+  if (num_before != 0)
+    {
+      g_ptr_array_add (podman_args, g_strdup (arg_prefix));
+      g_ptr_array_add (podman_args, g_strdup_printf ("%ld:%ld:%ld", container_id_start, host_id_start, num_before));
+    }
+
+  if (num_after != 0)
+    {
+      g_ptr_array_add (podman_args, g_strdup (arg_prefix));
+      g_ptr_array_add (podman_args, g_strdup_printf ("%ld:%ld:%ld", reserved_container_id + 1, host_id_start + num_before, num_after));
+    }
+}
+
+static void
+add_id_maps (GPtrArray *podman_args,
+             const char *arg_prefix,
+             long container_id,
+             long host_id,
+             long extra_container_ids_start,
+             long num_extra_ids)
+{
+  /* Always map root to host root, otherwise the container uid mapping layer becomes huge because
+   * most files are owned by root. Unless root was specifically chosen with User=0, then respect
+   * HostUser set above. */
+  if (container_id != 0)
+    add_id_map (podman_args, arg_prefix, 0, 0, 1, -1);
+
+  /* Map uid to host_uid */
+  add_id_map (podman_args, arg_prefix, container_id, host_id, 1, -1);
+
+  /* Map the rest of the available extra ids (skipping container_id) */
+  add_id_map (podman_args, arg_prefix, 1, extra_container_ids_start, num_extra_ids, container_id);
+}
+
+static QuadUnitFile *
+convert_container (QuadUnitFile *container, GError **error)
+{
+  g_autoptr(QuadUnitFile) service =  quad_unit_file_copy (container);
+
+  /* Rename old Container group to x-Container so that systemd ignores it */
+  quad_unit_file_rename_group (service, CONTAINER_GROUP, X_CONTAINER_GROUP);
+
+  g_autofree char *image = quad_unit_file_lookup_last (container, CONTAINER_GROUP, "Image");
+  if (image == NULL || image[0] == 0)
+    {
+      quad_fail (error, "No Image key specified");
+      return NULL;
+    }
+
+  /* Read env early so we can override it below */
+  g_auto(GStrv) environments = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "Environment");
+  g_autoptr(GHashTable) podman_env = parse_env_keys (environments);
+
+  /* Need the containers filesystem mounted to start podman */
+  quad_unit_file_add (service, UNIT_GROUP,
+                      "RequiresMountsFor", "%t/containers");
+
+  /* Remove any leftover cid file before starting, just to be sure.
+   * We remove any actual pre-existing container by name with --replace=true.
+   * But --cidfile will fail if the target exists. */
+  quad_unit_file_add (service, SERVICE_GROUP,
+                      "ExecStartPre", "-rm -f %t/%N.cid");
+
+  /* If the conman exited uncleanly it may not have removed the container, so force it,
+   * -i makes it ignore non-existing files. */
+  quad_unit_file_add (service, SERVICE_GROUP,
+                      "ExecStopPost", "-/usr/bin/podman rm -f -i --cidfile=%t/%N.cid");
+
+  g_autoptr(GPtrArray) podman_args = g_ptr_array_new_with_free_func (g_free);
+
+  g_ptr_array_add (podman_args, g_strdup ("/usr/bin/podman"));
+  g_ptr_array_add (podman_args, g_strdup ("run"));
+
+  /* We want to name the container by the service name */
+  g_ptr_array_add (podman_args, g_strdup ("--name=systemd-%N"));
+
+  /* We store the container id so we can clean it up in case of failure */
+  g_ptr_array_add (podman_args, g_strdup ("--cidfile=%t/%N.cid"));
+
+  /* And replace any previous container with the same name, not fail */
+  g_ptr_array_add (podman_args, g_strdup ("--replace"));
+
+  /* On clean shutdown, remove container */
+  g_ptr_array_add (podman_args, g_strdup ("--rm"));
+
+  /* Detach from container, we don't need the podman process to hang around */
+  g_ptr_array_add (podman_args, g_strdup ("-d"));
+
+  /* But we still want output to the journal, so use the log driver.
+   * TODO: Once available we want to use the passthrough log-driver instead. */
+  g_ptr_array_add (podman_args, g_strdup ("--log-driver"));
+  g_ptr_array_add (podman_args, g_strdup ("journald"));
+
+  /* We use crun as the runtime and delegated groups to it */
+  quad_unit_file_add (service, SERVICE_GROUP, "Delegate", g_strdup ("yes"));
+  g_ptr_array_add (podman_args, g_strdup ("--runtime"));
+  g_ptr_array_add (podman_args, g_strdup ("/usr/bin/crun"));
+  g_ptr_array_add (podman_args, g_strdup ("--cgroups=split"));
+
+  /* By default we handle startup notification with conmon, but allow passing it to the container with Notify=yes */
+  gboolean notify = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "Notify", FALSE);
+  if (notify)
+    g_ptr_array_add (podman_args, g_strdup ("--sdnotify=container"));
+  else
+    g_ptr_array_add (podman_args, g_strdup ("--sdnotify=conmon"));
+  quad_unit_file_add (service, SERVICE_GROUP, "Type", "notify");
+  quad_unit_file_add (service, SERVICE_GROUP, "NotifyAccess", "all");
+
+  /* The default syslog identifier is the exec basename (podman) which isn't very useful here */
+  quad_unit_file_add (service, SERVICE_GROUP, "SyslogIdentifier", "%N");
+
+  /* Run with a pid1 init to reap zombies (as most apps don't) */
+  g_ptr_array_add (podman_args, g_strdup ("--init"));
+
+  /* Never try to pull the image during service start */
+  g_ptr_array_add (podman_args, g_strdup ("--pull=never"));
+
+  /* Use the host timezone */
+  g_ptr_array_add (podman_args, g_strdup ("--tz=local"));
+
+  /* Default to no higher level privileges or caps */
+  g_ptr_array_add (podman_args, g_strdup ("--security-opt=no-new-privileges"));
+  g_ptr_array_add (podman_args, g_strdup ("--cap-drop=all"));
+
+  /* But allow overrides with AddCapability*/
+  g_auto(GStrv) add_caps = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "AddCapability");
+  for (guint i = 0; add_caps[i] != NULL; i++)
+    {
+      char *caps = g_strdup (add_caps[i]);
+      for (guint j = 0; caps[j] != 0; j++)
+        caps[j] = g_ascii_toupper (caps[j]);
+      g_ptr_array_add (podman_args, g_strdup_printf ("--cap-add=%s", caps));
+    }
+
+  /* We want /tmp to be a tmpfs, like on rhel host */
+  g_ptr_array_add (podman_args, g_strdup ("--mount"));
+  g_ptr_array_add (podman_args, g_strdup ("type=tmpfs,tmpfs-size=512M,destination=/tmp"));
+
+  gboolean socket_activated = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "SocketActivated", FALSE);
+  if (socket_activated)
+    {
+      /* TODO: This will not be needed with later podman versions that support activation directly:
+       *  https://github.com/containers/podman/pull/11316  */
+      g_ptr_array_add (podman_args, g_strdup ("--preserve-fds=1"));
+      g_hash_table_insert (podman_env, g_strdup ("LISTEN_FDS"), g_strdup ("1"));
+
+      /* TODO: This will not be 2 when catatonit forwards fds:
+       *  https://github.com/openSUSE/catatonit/pull/15 */
+      g_hash_table_insert (podman_env, g_strdup ("LISTEN_PID"), g_strdup ("2"));
+    }
+
+  long uid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "User", 0), 0);
+  long gid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "Group", 0), 0);
+  long host_uid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "HostUser", uid), 0);
+  long host_gid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "HostGroup", gid), 0);
+
+  if (uid != 0 && gid != 0)
+    {
+      g_ptr_array_add (podman_args, g_strdup ("--user"));
+      if (gid == 0)
+        g_ptr_array_add (podman_args, g_strdup_printf ("%ld", uid));
+      else
+        g_ptr_array_add (podman_args, g_strdup_printf ("%ld:%ld", uid, gid));
+    }
+
+  /* TODO: Make this configurable */
+  long uid_map_host_start = 10000;
+  long uid_map_len = 1000;
+  long gid_map_host_start = 10000;
+  long gid_map_len = 1000;
+
+  gboolean no_usermap = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "NoUsermap", FALSE);
+  if (no_usermap)
+    {
+      /* No remapping of users, although we still need maps if the
+         main user/group is remapped, even if most ids map one-to-one. */
+      if (uid != host_uid)
+        add_id_maps (podman_args, "--uidmap",
+                     uid, host_uid,
+                     1, UINT_MAX - 1);
+      if (gid != host_gid)
+        add_id_maps (podman_args, "--gidmap",
+                     uid, host_uid,
+                     1, UINT_MAX - 1);
+    }
+  else
+    {
+      add_id_maps (podman_args, "--uidmap",
+                   uid, host_uid,
+                   uid_map_host_start, uid_map_len);
+      add_id_maps (podman_args, "--gidmap",
+                   gid, host_gid,
+                   gid_map_host_start, gid_map_len);
+    }
+
+  g_auto(GStrv) volumes = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "Volume");
+  for (guint i = 0; volumes[i] != NULL; i++)
+    {
+      const char *volume = volumes[i];
+      char *source, *dest, *options = NULL;
+      g_autofree char *volume_name = NULL;
+      g_autofree char *volume_service_name = NULL;
+
+      g_auto(GStrv) parts = g_strsplit (volume, ":", 3);
+      if (g_strv_length (parts) < 2)
+        {
+          quad_log ("Ignoring invalid volume %s", volume);
+          continue;
+        }
+      source = parts[0];
+      dest = parts[1];
+      if (g_strv_length (parts) >= 3)
+        options = parts[2];
+
+      if (source[0] == '/')
+        {
+          /* Absolute path */
+          quad_unit_file_add (service, UNIT_GROUP,
+                              "RequiresMountsFor", source);
+        }
+      else
+        {
+          /* unit name (with .volume suffix) or named podman volume */
+
+          if (g_str_has_suffix (source, ".volume"))
+            {
+              /* the podman volume name is systemd-$name */
+              volume_name = quad_replace_extension (source, NULL, "systemd-", NULL);
+
+              /* the systemd unit name is $name-volume.service */
+              volume_service_name = quad_replace_extension (source, ".service", NULL, "-volume");
+
+              source = volume_name;
+
+              quad_unit_file_add (service, UNIT_GROUP,
+                                  "Requires", volume_service_name);
+              quad_unit_file_add (service, UNIT_GROUP,
+                                  "After", volume_service_name);
+            }
+        }
+
+      g_ptr_array_add (podman_args, g_strdup ("-v"));
+      g_ptr_array_add (podman_args, g_strdup_printf ("%s:%s%s%s", source, dest, options ? ":" : "", options ? options : ""));
+    }
+
+  g_autofree char **podman_env_keys = (char **)g_hash_table_get_keys_as_array (podman_env, NULL);
+  qsort (podman_env_keys, g_strv_length (podman_env_keys), sizeof (const char *), cmpstringp);
+  for (guint i = 0; podman_env_keys[i] != NULL; i++)
+    {
+      const char *key = podman_env_keys[i];
+      const char *value = g_hash_table_lookup (podman_env, key);
+      if (value)
+        {
+          g_ptr_array_add (podman_args, g_strdup ("--env"));
+          g_ptr_array_add (podman_args, g_strdup_printf ("%s=%s", key, value));
+        }
+    }
+
+  g_ptr_array_add (podman_args, g_strdup (image));
+
+   g_autofree char *exec_key = quad_unit_file_lookup_last (container, CONTAINER_GROUP, "Exec");
+  if (exec_key != NULL)
+    {
+      g_ptr_array_extend_and_steal (podman_args,
+                                    quad_split_string (exec_key, WHITESPACE,
+                                                       QUAD_SPLIT_RELAX|QUAD_SPLIT_UNQUOTE));
+    }
+
+  quad_unit_file_add (service, SERVICE_GROUP, "ExecStart", quad_escape_words (podman_args));
+
+  return g_steal_pointer (&service);
+}
+
+static QuadUnitFile *
+convert_volume (QuadUnitFile *container,
+                const char *name,
+                G_GNUC_UNUSED GError **error)
+{
+  g_autoptr(QuadUnitFile) service =  quad_unit_file_copy (container);
+  g_autofree char *volume_name = quad_replace_extension (name, NULL, "systemd-", NULL);
+
+  long uid = MAX (quad_unit_file_lookup_int (container, VOLUME_GROUP, "User", 0), 0);
+  long gid = MAX (quad_unit_file_lookup_int (container, VOLUME_GROUP, "Group", 0), 0);
+
+  /* Rename old Volume group to x-Volume so that systemd ignores it */
+  quad_unit_file_rename_group (service, VOLUME_GROUP, X_VOLUME_GROUP);
+
+  g_autofree char *exec_cond = g_strdup_printf ("/usr/bin/bash -c \"! /usr/bin/podman volume exists %s\"", volume_name);
+  g_autofree char *exec_start = g_strdup_printf ("/usr/bin/podman volume create --opt o=uid=%ld,gid=%ld %s", uid, gid, volume_name);
+
+
+  quad_unit_file_add (service, SERVICE_GROUP, "Type", "oneshot");
+  quad_unit_file_add (service, SERVICE_GROUP, "RemainAfterExit", "yes");
+  quad_unit_file_add (service, SERVICE_GROUP, "ExecCondition", exec_cond);
+  quad_unit_file_add (service, SERVICE_GROUP, "ExecStart", exec_start);
+
+  /* The default syslog identifier is the exec basename (podman) which isn't very useful here */
+  quad_unit_file_add (service, SERVICE_GROUP, "SyslogIdentifier", "%N");
+
+  return g_steal_pointer (&service);
+}
+
+static void
+generate_service_file (const char *output_path,
+                       const char *source_dir,
+                       const char *orig_filename,
+                       const char *extra_suffix,
+                       QuadUnitFile *service)
+{
+  g_autoptr(GString) str = g_string_new ("");
+  g_autoptr(GError) error = NULL;
+  g_autofree char *orig_path = g_build_filename (source_dir, orig_filename, NULL);
+  g_autofree char *service_name = quad_replace_extension (orig_filename, ".service", NULL, extra_suffix);
+  g_autofree char *out_filename = g_build_filename (output_path, service_name, NULL);
+
+  g_string_append (str, "# Automatically generated by quadlet-generator\n");
+  quad_unit_file_add (service, UNIT_GROUP,
+                      "SourcePath", orig_path);
+  quad_unit_file_print (service, str);
+
+  quad_log ("writing '%s'", out_filename);
+  if (!g_file_set_contents (out_filename, str->str, str->len, &error))
+    quad_log ("Error writing '%s', ignoring: %s", out_filename, error->message);
+}
+
+int
+main (int argc, const char *argv[])
+{
+  g_autoptr(GDir) dir = NULL;
+  g_autoptr(GError) dir_error = NULL;
+  const char *output_path;
+  const char *source_path;
+  const char *name;
+  GHashTableIter iter;
+  gpointer key, value;
+  g_autoptr(GHashTable) containers = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
+  g_autoptr(GHashTable) volumes = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
+
+  if (argc < 2)
+    {
+      quad_log ("Missing output directory argument");
+      return 1;
+    }
+
+  output_path = argv[1];
+
+  quad_log ("Starting quadlet-generator, output to: %s", output_path);
+
+  source_path  = quad_get_unit_dir ();
+
+  dir = g_dir_open (source_path, 0, &dir_error);
+  if (dir == NULL)
+    {
+      if (g_error_matches (dir_error, G_FILE_ERROR, G_FILE_ERROR_NOENT))
+        {
+          quad_log ("No source dir %s", source_path);
+          return 0; /* No units, success */
+        }
+
+      quad_log ("Can't read \"%s\": %s", source_path, dir_error->message);
+      return 1;
+    }
+
+  while ((name = g_dir_read_name (dir)) != NULL)
+    {
+      if (g_str_has_suffix (name, ".container") ||
+          g_str_has_suffix (name, ".volume"))
+        {
+          g_autofree char *path = g_build_filename (source_path, name, NULL);
+          g_autoptr(QuadUnitFile) unit = NULL;
+          g_autoptr(GError) error = NULL;
+
+          quad_log ("Loading source unit file %s", path);
+
+          unit = quad_unit_file_new_from_path (path, &error);
+          if (unit == NULL)
+            quad_log ("Error loading '%s', ignoring: %s", path, error->message);
+          else
+            {
+              GHashTable *units;
+
+              if (g_str_has_suffix (name, ".container"))
+                units = containers;
+              else
+                units = volumes;
+
+              g_hash_table_insert (units, g_strdup (name), g_steal_pointer (&unit));
+            }
+        }
+    }
+
+  g_hash_table_iter_init (&iter, volumes);
+  while (g_hash_table_iter_next (&iter, &key, &value))
+    {
+      const char *name = key;
+      QuadUnitFile *container = value;
+      g_autoptr(QuadUnitFile) service = NULL;
+      g_autoptr(GError) error = NULL;
+
+      service = convert_volume (container, name, &error);
+      if (service == NULL)
+        quad_log ("Error converting '%s', ignoring: %s", name, error->message);
+      else
+        generate_service_file (output_path, source_path, name, "-volume", service);
+    }
+
+  g_hash_table_iter_init (&iter, containers);
+  while (g_hash_table_iter_next (&iter, &key, &value))
+    {
+      const char *name = key;
+      QuadUnitFile *container = value;
+      g_autoptr(QuadUnitFile) service = NULL;
+      g_autoptr(GError) error = NULL;
+
+      service = convert_container (container, &error);
+      if (service == NULL)
+        quad_log ("Error converting '%s', ignoring: %s", name, error->message);
+      else
+        generate_service_file (output_path, source_path, name, NULL, service);
+    }
+
+  return 0;
+}
