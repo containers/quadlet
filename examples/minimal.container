@@ -1,0 +1,16 @@
+[Unit]
+Description=A minimal container
+
+[Container]
+# We want to us the centos image
+Image=centos
+
+# In the container we just run sleep
+Exec=sleep 60
+
+[Service]
+# Restart service when sleep finishes
+Restart=always
+
+[Install]
+WantedBy=multi-user.target default.target
