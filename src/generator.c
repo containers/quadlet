@@ -110,6 +110,19 @@ convert_container (QuadUnitFile *container, GError **error)
       return NULL;
     }
 
+  /* Only allow mixed or control-group, as nothing else works well */
+  g_autofree char *kill_mode = quad_unit_file_lookup_last (service, SERVICE_GROUP, "KillMode");
+  if (kill_mode == NULL ||
+      !(strcmp (kill_mode, "mixed") == 0 ||
+        strcmp (kill_mode, "control-group") == 0))
+    {
+      if (kill_mode != NULL)
+        quad_log ("Invalid KillMode '%s', ignoring", kill_mode);
+
+      /* We default to mixed instead of control-group, because it lets conmon do its thing */
+      quad_unit_file_set (service, SERVICE_GROUP, "KillMode", "mixed");
+    }
+
   /* Read env early so we can override it below */
   g_auto(GStrv) environments = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "Environment");
   g_autoptr(GHashTable) podman_env = parse_env_keys (environments);
