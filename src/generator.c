@@ -396,6 +396,14 @@ convert_container (QuadUnitFile *container, GError **error)
 
   quad_podman_add_env (podman, podman_env);
 
+  g_autofree char *podman_args_s = quad_unit_file_lookup_last (container, CONTAINER_GROUP, "PodmanArgs");
+  if (podman_args_s != NULL)
+    {
+      g_autoptr(GPtrArray) podman_args = quad_split_string (podman_args_s, WHITESPACE,
+                                                            QUAD_SPLIT_RELAX|QUAD_SPLIT_UNQUOTE);
+      quad_podman_add_array (podman, (const char **)podman_args->pdata, podman_args->len);
+    }
+
   quad_podman_add (podman, image);
 
   g_autofree char *exec_key = quad_unit_file_lookup_last (container, CONTAINER_GROUP, "Exec");
