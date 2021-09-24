@@ -616,7 +616,7 @@ quad_fail (GError    **error,
   return FALSE;
 }
 
-static void
+static gboolean
 log_to_kmsg (const char *line)
 {
   static int dev_kmsg_fd = -2;
@@ -625,9 +625,11 @@ log_to_kmsg (const char *line)
     dev_kmsg_fd = open ("/dev/kmsg", O_WRONLY);
 
   if (dev_kmsg_fd < 0)
-    return; /* Failed open */
+    return FALSE; /* Failed open */
 
    write (dev_kmsg_fd, line, strlen (line));
+
+   return TRUE;
 }
 
 void
@@ -637,10 +639,13 @@ quad_logv (const char *fmt,
   g_autofree char *s = g_strdup_vprintf (fmt, args);
   g_autofree char *log = g_strdup_printf ("quadlet-generator[%d]: %s\n", getpid (), s);
 
-  log_to_kmsg (log);
-  fputs (s, stderr);
-  fputs ("\n", stderr);
-  fflush (stderr);
+  if (!log_to_kmsg (log))
+    {
+      /* If we can't log, print to stderr */
+      fputs (s, stderr);
+      fputs ("\n", stderr);
+      fflush (stderr);
+    }
 }
 
 void
