@@ -13,6 +13,66 @@
 #define VOLUME_GROUP "Volume"
 #define X_VOLUME_GROUP "X-Volume"
 
+
+static const char *supported_container_keys[] = {
+  "Image",
+  "Environment",
+  "Exec",
+  "AddCapability",
+  "NoUsermap",
+  "Notify",
+  "SocketActivated",
+  "ExposeHostPort",
+  "PublishPort",
+  "User",
+  "Group",
+  "HostUser",
+  "HostGroup",
+  "Volume",
+  "PodmanArgs",
+  NULL
+};
+static GHashTable *supported_container_keys_hash = NULL;
+
+static const char *supported_volume_keys[] = {
+  "User",
+  "Group",
+  NULL
+};
+static GHashTable *supported_volume_keys_hash = NULL;
+
+static void
+warn_for_unknown_keys (QuadUnitFile *unit,
+                       const char *group_name,
+                       const char **supported_keys,
+                       GHashTable **supported_hash_p)
+{
+  g_autofree const char **keys = quad_unit_file_list_keys (unit, group_name);
+  g_autoptr(GHashTable) warned = NULL;
+
+  if (*supported_hash_p == NULL)
+    {
+      *supported_hash_p = g_hash_table_new (g_str_hash, g_str_equal);
+      for (guint i = 0; supported_keys[i] != NULL; i++)
+        g_hash_table_add (*supported_hash_p, (char *)supported_keys[i]);
+    }
+
+  for (guint i = 0; keys[i] != NULL; i++)
+    {
+      const char *key = keys[i];
+      if (!g_hash_table_contains (*supported_hash_p, key))
+        {
+          if (warned == NULL)
+            warned = g_hash_table_new (g_str_hash, g_str_equal);
+          if (!g_hash_table_contains (warned, key))
+            {
+              quad_log ("Unsupported key '%s' in group '%s' in %s", key, group_name, quad_unit_file_get_path (unit));
+              g_hash_table_add (warned, (char *)key);
+            }
+        }
+    }
+}
+
 static void
 parse_env_val (GHashTable *out,
                const char *env_val)
@@ -96,7 +156,6 @@ is_port_range (const char *port)
   return g_regex_match_simple ("\\d+(-\\d+)?$", port, G_REGEX_DOLLAR_ENDONLY, G_REGEX_MATCH_ANCHORED);
 }
 
-
 static QuadUnitFile *
 convert_container (QuadUnitFile *container, GError **error)
 {
@@ -104,6 +163,8 @@ convert_container (QuadUnitFile *container, GError **error)
 
   /* Rename old Container group to x-Container so that systemd ignores it */
   quad_unit_file_rename_group (service, CONTAINER_GROUP, X_CONTAINER_GROUP);
+
+  warn_for_unknown_keys (container, CONTAINER_GROUP, supported_container_keys, &supported_container_keys_hash);
 
   g_autofree char *image = quad_unit_file_lookup_last (container, CONTAINER_GROUP, "Image");
   if (image == NULL || image[0] == 0)
@@ -427,6 +488,8 @@ convert_volume (QuadUnitFile *container,
 {
   g_autoptr(QuadUnitFile) service =  quad_unit_file_copy (container);
   g_autofree char *volume_name = quad_replace_extension (name, NULL, "systemd-", NULL);
+
+  warn_for_unknown_keys (container, VOLUME_GROUP, supported_volume_keys, &supported_volume_keys_hash);
 
   long uid = MAX (quad_unit_file_lookup_int (container, VOLUME_GROUP, "User", 0), 0);
   long gid = MAX (quad_unit_file_lookup_int (container, VOLUME_GROUP, "Group", 0), 0);
