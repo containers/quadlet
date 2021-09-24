@@ -193,7 +193,7 @@ void
 quad_unit_file_merge (QuadUnitFile *self,
                       QuadUnitFile *source)
 {
-  for (guint i; i < source->groups->len; i++)
+  for (guint i = 0; i < source->groups->len; i++)
     {
       QuadUnitGroup *src_group = g_ptr_array_index (source->groups, i);
       QuadUnitGroup *group =  quad_unit_file_ensure_group (self, src_group->name);
