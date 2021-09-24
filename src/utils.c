@@ -656,3 +656,23 @@ quad_log (const char *fmt, ...)
   quad_logv (fmt, args);
   va_end (args);
 }
+
+static gboolean do_debug = FALSE;
+
+void
+quad_enable_debug (void)
+{
+  do_debug = TRUE;
+}
+
+void
+quad_debug (const char *fmt, ...)
+{
+  va_list args;
+  if (do_debug)
+    {
+      va_start (args, fmt);
+      quad_logv (fmt, args);
+      va_end (args);
+    }
+}

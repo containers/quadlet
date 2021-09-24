@@ -34,6 +34,8 @@ gboolean              quad_fail                    (GError **error,
 void                  quad_logv                    (const char     *fmt,
                                                     va_list         args);
 void                  quad_log                     (const char *fmt, ...) G_GNUC_PRINTF (1,2);
+void                  quad_enable_debug            (void);
+void                  quad_debug                   (const char *fmt, ...) G_GNUC_PRINTF (1,2);
 
 #define _QUAD_CONCAT(a, b)  a##b
 #define _QUAD_CONCAT_INDIRECT(a, b) _QUAD_CONCAT(a, b)

@@ -3,7 +3,7 @@
 #include <glib-object.h>
 #include <unitfile.h>
 #include <utils.h>
-
+#include <locale.h>
 
 #define UNIT_GROUP "Unit"
 #define SERVICE_GROUP "Service"
@@ -395,7 +395,7 @@ generate_service_file (const char *output_path,
                         "SourcePath", orig_path);
   quad_unit_file_print (service, str);
 
-  quad_log ("writing '%s'", out_filename);
+  quad_debug ("writing '%s'", out_filename);
   if (!g_file_set_contents (out_filename, str->str, str->len, &error))
     quad_log ("Error writing '%s', ignoring: %s", out_filename, error->message);
 }
@@ -426,7 +426,7 @@ load_units_from_dir (const char *source_path,
           g_autoptr(QuadUnitFile) unit = NULL;
           g_autoptr(GError) error = NULL;
 
-          quad_log ("Loading source unit file %s", path);
+          quad_debug ("Loading source unit file %s", path);
 
           unit = quad_unit_file_new_from_path (path, &error);
           if (unit == NULL)
@@ -437,14 +437,46 @@ load_units_from_dir (const char *source_path,
     }
 }
 
+static gboolean opt_verbose;
+static gboolean opt_version;
+
+static GOptionEntry entries[] = {
+  { "verbose", 'v', 0, G_OPTION_ARG_NONE, &opt_verbose, "Print debug information", NULL },
+  { "version", 0, 0, G_OPTION_ARG_NONE, &opt_version, "Print version information and exit", NULL },
+  { NULL }
+};
+
 int
 main (int argc,
-      const char *argv[])
+      char **argv)
 {
+  g_autoptr(GOptionContext) context = NULL;
+  g_autoptr(GHashTable) units = NULL;
+  g_autoptr(GError) error = NULL;
   const char *output_path;
   const char **source_paths;
 
-  g_autoptr(GHashTable) units = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
+  setlocale (LC_ALL, "");
+
+  g_set_prgname (argv[0]);
+
+  context = g_option_context_new ("OUTPUTDIR - Generate service files");
+  g_option_context_add_main_entries (context, entries, NULL);
+
+  if (!g_option_context_parse (context, &argc, &argv, &error))
+    {
+      quad_log ("Option parsing failed: %s\n", error->message);
+      return 1;
+    }
+
+  if (opt_version)
+    {
+      g_print ("quadlet %s\n", PACKAGE_VERSION);
+      return 0;
+    }
+
+  if (opt_verbose)
+    quad_enable_debug ();
 
   if (argc < 2)
     {
@@ -454,10 +486,11 @@ main (int argc,
 
   output_path = argv[1];
 
-  quad_log ("Starting quadlet-generator, output to: %s", output_path);
+  quad_debug ("Starting quadlet-generator, output to: %s", output_path);
 
   source_paths  = quad_get_unit_dirs ();
 
+  units = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
   for (guint i = 0; source_paths[i] != NULL; i++)
     load_units_from_dir (source_paths[i], units);
 
