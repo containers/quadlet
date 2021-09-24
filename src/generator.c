@@ -179,11 +179,12 @@ convert_container (QuadUnitFile *container, GError **error)
     g_ptr_array_add (podman_args, g_strdup ("--sdnotify=container"));
   else
     g_ptr_array_add (podman_args, g_strdup ("--sdnotify=conmon"));
-  quad_unit_file_add (service, SERVICE_GROUP, "Type", "notify");
-  quad_unit_file_add (service, SERVICE_GROUP, "NotifyAccess", "all");
+  quad_unit_file_setv (service, SERVICE_GROUP,
+                       "Type", "notify",
+                       "NotifyAccess", "all",
+                       NULL);
 
-  /* The default syslog identifier is the exec basename (podman) which isn't very useful here */
-  quad_unit_file_add (service, SERVICE_GROUP, "SyslogIdentifier", "%N");
+  quad_unit_file_set (service, SERVICE_GROUP, "SyslogIdentifier", "%N");
 
   /* Run with a pid1 init to reap zombies (as most apps don't) */
   g_ptr_array_add (podman_args, g_strdup ("--init"));
@@ -364,14 +365,15 @@ convert_volume (QuadUnitFile *container,
   g_autofree char *exec_cond = g_strdup_printf ("/usr/bin/bash -c \"! /usr/bin/podman volume exists %s\"", volume_name);
   g_autofree char *exec_start = g_strdup_printf ("/usr/bin/podman volume create --opt o=uid=%ld,gid=%ld %s", uid, gid, volume_name);
 
+  quad_unit_file_setv (service, SERVICE_GROUP,
+                       "Type", "oneshot",
+                       "RemainAfterExit", "yes",
+                       "ExecCondition", exec_cond,
+                       "ExecStart", exec_start,
 
-  quad_unit_file_add (service, SERVICE_GROUP, "Type", "oneshot");
-  quad_unit_file_add (service, SERVICE_GROUP, "RemainAfterExit", "yes");
-  quad_unit_file_add (service, SERVICE_GROUP, "ExecCondition", exec_cond);
-  quad_unit_file_add (service, SERVICE_GROUP, "ExecStart", exec_start);
-
-  /* The default syslog identifier is the exec basename (podman) which isn't very useful here */
-  quad_unit_file_add (service, SERVICE_GROUP, "SyslogIdentifier", "%N");
+                       /* The default syslog identifier is the exec basename (podman) which isn't very useful here */
+                       "SyslogIdentifier", "%N",
+                       NULL);
 
   return g_steal_pointer (&service);
 }

@@ -775,6 +775,27 @@ quad_unit_file_set (QuadUnitFile  *self,
 }
 
 void
+quad_unit_file_setv (QuadUnitFile  *self,
+                     const char    *group_name,
+                     ...)
+{
+  va_list args;
+  const char *key;
+  const char *value;
+
+  va_start (args, group_name);
+
+  while ((key = va_arg(args, char *)) != NULL)
+    {
+      value = va_arg(args, char *);
+      quad_unit_file_set (self, group_name, key, value);
+    }
+
+  va_end (args);
+}
+
+
+void
 quad_unit_file_add (QuadUnitFile  *self,
                     const char    *group_name,
                     const char    *key,

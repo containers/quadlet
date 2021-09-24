@@ -52,6 +52,9 @@ void          quad_unit_file_set             (QuadUnitFile  *self,
                                               const char    *group_name,
                                               const char    *key,
                                               const char    *value);
+void          quad_unit_file_setv            (QuadUnitFile  *self,
+                                              const char    *group_name,
+                                              ...) G_GNUC_NULL_TERMINATED;
 void          quad_unit_file_add             (QuadUnitFile  *self,
                                               const char    *group_name,
                                               const char    *key,
