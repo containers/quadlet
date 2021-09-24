@@ -18,6 +18,9 @@ QuadUnitFile *quad_unit_file_copy            (QuadUnitFile  *self);
 gboolean      quad_unit_file_parse           (QuadUnitFile  *self,
                                               const char    *data,
                                               GError       **error);
+const char *  quad_unit_file_get_path        (QuadUnitFile  *self);
+void          quad_unit_file_set_path        (QuadUnitFile  *self,
+                                              const char    *path);
 void          quad_unit_file_print           (QuadUnitFile  *self,
                                               GString       *str);
 const char *  quad_unit_file_lookup_last_raw (QuadUnitFile  *self,

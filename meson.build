@@ -10,11 +10,14 @@ top_inc = include_directories('.')
 
 quadlet_prefix = get_option('prefix')
 quadlet_generatordir = join_paths(quadlet_prefix, quadlet_prefix, 'lib/systemd/system-generators')
-quadlet_sysconfdir = join_paths(quadlet_prefix, get_option('sysconfdir'), 'containers/systemd')
+quadlet_admin_containersdir = join_paths(quadlet_prefix, get_option('sysconfdir'), 'containers')
+quadlet_distro_containersdir = join_paths(quadlet_prefix, quadlet_prefix, 'share/containers')
 
 config_h = configuration_data()
 config_h.set_quoted('PACKAGE_VERSION', meson.project_version())
-config_h.set_quoted('QUADLET_UNIT_DIR', quadlet_sysconfdir)
+config_h.set_quoted('QUADLET_UNIT_DIR_DISTRO', join_paths(quadlet_distro_containersdir, 'systemd'))
+config_h.set_quoted('QUADLET_UNIT_DIR_ADMIN', join_paths(quadlet_admin_containersdir, 'systemd'))
+
 configure_file(
   output: 'quadlet-config.h',
   configuration: config_h,

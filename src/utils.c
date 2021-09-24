@@ -11,19 +11,26 @@
 #include "utils.h"
 #include <stdint.h>
 
-const char *
-quad_get_unit_dir (void)
+const char **
+quad_get_unit_dirs (void)
 {
-  static const char *unit_dir = NULL;
+  static const char **unit_dirs = NULL;
+  static const char *unit_dirs_default[] = {
+    QUADLET_UNIT_DIR_ADMIN,
+    QUADLET_UNIT_DIR_DISTRO,
+    NULL
+  };
 
-  if (unit_dir == NULL)
+  if (unit_dirs == NULL)
     {
-      unit_dir = g_getenv ("QUADLET_UNIT_DIR");
-      if (unit_dir == NULL)
-        unit_dir = QUADLET_UNIT_DIR;
+      const char *unit_dirs_env = g_getenv ("QUADLET_UNIT_DIRS");
+      if (unit_dirs_env != NULL)
+        unit_dirs = (const char **)g_strsplit (unit_dirs_env, ":", -1);
+      else
+        unit_dirs = unit_dirs_default;
     }
 
-  return unit_dir;
+  return unit_dirs;
 }
 
 char *

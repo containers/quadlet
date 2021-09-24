@@ -23,6 +23,8 @@ struct _QuadUnitFile
   GPtrArray *groups;
   GHashTable *group_hash; /* keys/values owned by groups array */
 
+  char *path;
+
   /* During parsing: */
   QuadUnitGroup *current_group;
   GPtrArray *pending_comments;
@@ -160,7 +162,23 @@ quad_unit_file_new_from_path (const char *path, GError **error)
   if (!quad_unit_file_parse (unit, data, error))
     return NULL;
 
+  unit->path = g_strdup (path);
+
   return g_steal_pointer(&unit);
+}
+
+const char *
+quad_unit_file_get_path (QuadUnitFile  *self)
+{
+  return self->path;
+}
+
+void
+quad_unit_file_set_path (QuadUnitFile  *self,
+                         const char *path)
+{
+  g_free (self->path);
+  self->path = g_strdup (path);
 }
 
 QuadUnitFile *
@@ -839,6 +857,7 @@ quad_unit_file_finalize (GObject *object)
   g_ptr_array_free (self->groups, TRUE);
   g_hash_table_destroy (self->group_hash);
   g_ptr_array_free (self->pending_comments, TRUE);
+  g_free (self->path);
 
   G_OBJECT_CLASS (quad_unit_file_parent_class)->finalize (object);
 }
