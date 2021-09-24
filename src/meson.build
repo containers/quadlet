@@ -3,6 +3,8 @@ src_inc = include_directories('.')
 lib_sources = files(
   'unitfile.c',
   'unitfile.h',
+  'podman.c',
+  'podman.h',
   'utils.c',
   'utils.h',
 )

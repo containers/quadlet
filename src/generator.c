@@ -2,6 +2,7 @@
 
 #include <glib-object.h>
 #include <unitfile.h>
+#include <podman.h>
 #include <utils.h>
 #include <locale.h>
 
@@ -36,14 +37,8 @@ parse_env_keys (char **environments)
   return res;
 }
 
-static int
-cmpstringp (const void *p1, const void *p2)
-{
-  return strcmp (*(char * const *) p1, *(char * const *) p2);
-}
-
 static void
-add_id_map (GPtrArray *podman_args,
+add_id_map (QuadPodman *podman,
             const char *arg_prefix,
             long container_id_start,
             long host_id_start,
@@ -63,19 +58,19 @@ add_id_map (GPtrArray *podman_args,
 
   if (num_before != 0)
     {
-      g_ptr_array_add (podman_args, g_strdup (arg_prefix));
-      g_ptr_array_add (podman_args, g_strdup_printf ("%ld:%ld:%ld", container_id_start, host_id_start, num_before));
+      quad_podman_add (podman, arg_prefix);
+      quad_podman_addf (podman, "%ld:%ld:%ld", container_id_start, host_id_start, num_before);
     }
 
   if (num_after != 0)
     {
-      g_ptr_array_add (podman_args, g_strdup (arg_prefix));
-      g_ptr_array_add (podman_args, g_strdup_printf ("%ld:%ld:%ld", reserved_container_id + 1, host_id_start + num_before, num_after));
+      quad_podman_add (podman, arg_prefix);
+      quad_podman_addf (podman,"%ld:%ld:%ld", reserved_container_id + 1, host_id_start + num_before, num_after);
     }
 }
 
 static void
-add_id_maps (GPtrArray *podman_args,
+add_id_maps (QuadPodman *podman,
              const char *arg_prefix,
              long container_id,
              long host_id,
@@ -86,13 +81,13 @@ add_id_maps (GPtrArray *podman_args,
    * most files are owned by root. Unless root was specifically chosen with User=0, then respect
    * HostUser set above. */
   if (container_id != 0)
-    add_id_map (podman_args, arg_prefix, 0, 0, 1, -1);
+    add_id_map (podman, arg_prefix, 0, 0, 1, -1);
 
   /* Map uid to host_uid */
-  add_id_map (podman_args, arg_prefix, container_id, host_id, 1, -1);
+  add_id_map (podman, arg_prefix, container_id, host_id, 1, -1);
 
   /* Map the rest of the available extra ids (skipping container_id) */
-  add_id_map (podman_args, arg_prefix, 1, extra_container_ids_start, num_extra_ids, container_id);
+  add_id_map (podman, arg_prefix, 1, extra_container_ids_start, num_extra_ids, container_id);
 }
 
 static QuadUnitFile *
@@ -142,43 +137,52 @@ convert_container (QuadUnitFile *container, GError **error)
   quad_unit_file_add (service, SERVICE_GROUP,
                       "ExecStopPost", "-/usr/bin/podman rm -f -i --cidfile=%t/%N.cid");
 
-  g_autoptr(GPtrArray) podman_args = g_ptr_array_new_with_free_func (g_free);
+  g_autoptr(QuadPodman) podman = quad_podman_new ();
 
-  g_ptr_array_add (podman_args, g_strdup ("/usr/bin/podman"));
-  g_ptr_array_add (podman_args, g_strdup ("run"));
+  quad_podman_addv (podman, "run",
 
-  /* We want to name the container by the service name */
-  g_ptr_array_add (podman_args, g_strdup ("--name=systemd-%N"));
+                    /* We want to name the container by the service name */
+                    "--name=systemd-%N",
 
-  /* We store the container id so we can clean it up in case of failure */
-  g_ptr_array_add (podman_args, g_strdup ("--cidfile=%t/%N.cid"));
+                    /* We store the container id so we can clean it up in case of failure */
+                    "--cidfile=%t/%N.cid",
 
-  /* And replace any previous container with the same name, not fail */
-  g_ptr_array_add (podman_args, g_strdup ("--replace"));
+                    /* And replace any previous container with the same name, not fail */
+                    "--replace",
 
-  /* On clean shutdown, remove container */
-  g_ptr_array_add (podman_args, g_strdup ("--rm"));
+                    /* On clean shutdown, remove container */
+                    "--rm",
 
-  /* Detach from container, we don't need the podman process to hang around */
-  g_ptr_array_add (podman_args, g_strdup ("-d"));
+                    /* Detach from container, we don't need the podman process to hang around */
+                    "-d",
 
-  /* But we still want output to the journal, so use the log driver.
-   * TODO: Once available we want to use the passthrough log-driver instead. */
-  g_ptr_array_add (podman_args, g_strdup ("--log-driver"));
-  g_ptr_array_add (podman_args, g_strdup ("journald"));
+                    /* But we still want output to the journal, so use the log driver.
+                     * TODO: Once available we want to use the passthrough log-driver instead. */
+                    "--log-driver", "journald",
+
+                    /* Run with a pid1 init to reap zombies (as most apps don't) */
+                    "--init",
+
+                    /* Never try to pull the image during service start */
+                    "--pull=never",
+
+                    /* Use the host timezone */
+                    "--tz=local",
+                    NULL);
 
   /* We use crun as the runtime and delegated groups to it */
   quad_unit_file_add (service, SERVICE_GROUP, "Delegate", g_strdup ("yes"));
-  g_ptr_array_add (podman_args, g_strdup ("--runtime"));
-  g_ptr_array_add (podman_args, g_strdup ("/usr/bin/crun"));
-  g_ptr_array_add (podman_args, g_strdup ("--cgroups=split"));
+  quad_podman_addv (podman,
+                    "--runtime", "/usr/bin/crun",
+                    "--cgroups=split",
+                    NULL);
 
   /* By default we handle startup notification with conmon, but allow passing it to the container with Notify=yes */
   gboolean notify = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "Notify", FALSE);
   if (notify)
-    g_ptr_array_add (podman_args, g_strdup ("--sdnotify=container"));
+    quad_podman_add (podman, "--sdnotify=container");
   else
-    g_ptr_array_add (podman_args, g_strdup ("--sdnotify=conmon"));
+    quad_podman_add (podman, "--sdnotify=conmon");
   quad_unit_file_setv (service, SERVICE_GROUP,
                        "Type", "notify",
                        "NotifyAccess", "all",
@@ -186,18 +190,11 @@ convert_container (QuadUnitFile *container, GError **error)
 
   quad_unit_file_set (service, SERVICE_GROUP, "SyslogIdentifier", "%N");
 
-  /* Run with a pid1 init to reap zombies (as most apps don't) */
-  g_ptr_array_add (podman_args, g_strdup ("--init"));
-
-  /* Never try to pull the image during service start */
-  g_ptr_array_add (podman_args, g_strdup ("--pull=never"));
-
-  /* Use the host timezone */
-  g_ptr_array_add (podman_args, g_strdup ("--tz=local"));
-
   /* Default to no higher level privileges or caps */
-  g_ptr_array_add (podman_args, g_strdup ("--security-opt=no-new-privileges"));
-  g_ptr_array_add (podman_args, g_strdup ("--cap-drop=all"));
+  quad_podman_addv (podman,
+                    "--security-opt=no-new-privileges",
+                    "--cap-drop=all",
+                    NULL);
 
   /* But allow overrides with AddCapability*/
   g_auto(GStrv) add_caps = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "AddCapability");
@@ -206,19 +203,18 @@ convert_container (QuadUnitFile *container, GError **error)
       char *caps = g_strdup (add_caps[i]);
       for (guint j = 0; caps[j] != 0; j++)
         caps[j] = g_ascii_toupper (caps[j]);
-      g_ptr_array_add (podman_args, g_strdup_printf ("--cap-add=%s", caps));
+      quad_podman_addf (podman, "--cap-add=%s", caps);
     }
 
   /* We want /tmp to be a tmpfs, like on rhel host */
-  g_ptr_array_add (podman_args, g_strdup ("--mount"));
-  g_ptr_array_add (podman_args, g_strdup ("type=tmpfs,tmpfs-size=512M,destination=/tmp"));
+  quad_podman_addv (podman, "--mount", "type=tmpfs,tmpfs-size=512M,destination=/tmp", NULL);
 
   gboolean socket_activated = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "SocketActivated", FALSE);
   if (socket_activated)
     {
       /* TODO: This will not be needed with later podman versions that support activation directly:
        *  https://github.com/containers/podman/pull/11316  */
-      g_ptr_array_add (podman_args, g_strdup ("--preserve-fds=1"));
+      quad_podman_add (podman, "--preserve-fds=1");
       g_hash_table_insert (podman_env, g_strdup ("LISTEN_FDS"), g_strdup ("1"));
 
       /* TODO: This will not be 2 when catatonit forwards fds:
@@ -233,11 +229,11 @@ convert_container (QuadUnitFile *container, GError **error)
 
   if (uid != 0 && gid != 0)
     {
-      g_ptr_array_add (podman_args, g_strdup ("--user"));
+      quad_podman_add (podman, "--user");
       if (gid == 0)
-        g_ptr_array_add (podman_args, g_strdup_printf ("%ld", uid));
+        quad_podman_addf (podman, "%ld", uid);
       else
-        g_ptr_array_add (podman_args, g_strdup_printf ("%ld:%ld", uid, gid));
+        quad_podman_addf (podman, "%ld:%ld", uid, gid);
     }
 
   /* TODO: Make this configurable */
@@ -252,20 +248,20 @@ convert_container (QuadUnitFile *container, GError **error)
       /* No remapping of users, although we still need maps if the
          main user/group is remapped, even if most ids map one-to-one. */
       if (uid != host_uid)
-        add_id_maps (podman_args, "--uidmap",
+        add_id_maps (podman, "--uidmap",
                      uid, host_uid,
                      1, UINT_MAX - 1);
       if (gid != host_gid)
-        add_id_maps (podman_args, "--gidmap",
+        add_id_maps (podman, "--gidmap",
                      uid, host_uid,
                      1, UINT_MAX - 1);
     }
   else
     {
-      add_id_maps (podman_args, "--uidmap",
+      add_id_maps (podman, "--uidmap",
                    uid, host_uid,
                    uid_map_host_start, uid_map_len);
-      add_id_maps (podman_args, "--gidmap",
+      add_id_maps (podman, "--gidmap",
                    gid, host_gid,
                    gid_map_host_start, gid_map_len);
     }
@@ -316,34 +312,24 @@ convert_container (QuadUnitFile *container, GError **error)
             }
         }
 
-      g_ptr_array_add (podman_args, g_strdup ("-v"));
-      g_ptr_array_add (podman_args, g_strdup_printf ("%s:%s%s%s", source, dest, options ? ":" : "", options ? options : ""));
+      quad_podman_add (podman, "-v");
+      quad_podman_addf (podman, "%s:%s%s%s", source, dest, options ? ":" : "", options ? options : "");
     }
 
-  g_autofree char **podman_env_keys = (char **)g_hash_table_get_keys_as_array (podman_env, NULL);
-  qsort (podman_env_keys, g_strv_length (podman_env_keys), sizeof (const char *), cmpstringp);
-  for (guint i = 0; podman_env_keys[i] != NULL; i++)
-    {
-      const char *key = podman_env_keys[i];
-      const char *value = g_hash_table_lookup (podman_env, key);
-      if (value)
-        {
-          g_ptr_array_add (podman_args, g_strdup ("--env"));
-          g_ptr_array_add (podman_args, g_strdup_printf ("%s=%s", key, value));
-        }
-    }
+  quad_podman_add_env (podman, podman_env);
 
-  g_ptr_array_add (podman_args, g_strdup (image));
+  quad_podman_add (podman, image);
 
    g_autofree char *exec_key = quad_unit_file_lookup_last (container, CONTAINER_GROUP, "Exec");
   if (exec_key != NULL)
     {
-      g_ptr_array_extend_and_steal (podman_args,
-                                    quad_split_string (exec_key, WHITESPACE,
-                                                       QUAD_SPLIT_RELAX|QUAD_SPLIT_UNQUOTE));
+      g_autoptr(GPtrArray) exec_args = quad_split_string (exec_key, WHITESPACE,
+                                                          QUAD_SPLIT_RELAX|QUAD_SPLIT_UNQUOTE);
+      quad_podman_add_array (podman, (const char **)exec_args->pdata, exec_args->len);
     }
 
-  quad_unit_file_add (service, SERVICE_GROUP, "ExecStart", quad_escape_words (podman_args));
+  g_autofree char *exec_start = quad_podman_to_exec (podman);
+  quad_unit_file_add (service, SERVICE_GROUP, "ExecStart", exec_start);
 
   return g_steal_pointer (&service);
 }
@@ -363,7 +349,17 @@ convert_volume (QuadUnitFile *container,
   quad_unit_file_rename_group (service, VOLUME_GROUP, X_VOLUME_GROUP);
 
   g_autofree char *exec_cond = g_strdup_printf ("/usr/bin/bash -c \"! /usr/bin/podman volume exists %s\"", volume_name);
-  g_autofree char *exec_start = g_strdup_printf ("/usr/bin/podman volume create --opt o=uid=%ld,gid=%ld %s", uid, gid, volume_name);
+
+  g_autoptr(QuadPodman) podman = quad_podman_new ();
+  quad_podman_addv (podman,
+                    "volume", "create",
+                    "--opt", NULL);
+  quad_podman_addf (podman,
+                    "o=uid=%ld,gid=%ld",
+                    uid, gid);
+  quad_podman_add (podman,volume_name);
+
+  g_autofree char *exec_start = quad_podman_to_exec (podman);
 
   quad_unit_file_setv (service, SERVICE_GROUP,
                        "Type", "oneshot",
