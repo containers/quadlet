@@ -1,0 +1,13 @@
+[Unit]
+Description=Redis container
+
+[Container]
+Image=docker.io/redis
+PublishPort=6379:6379
+User=999
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=local.target

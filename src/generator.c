@@ -90,6 +90,13 @@ add_id_maps (QuadPodman *podman,
   add_id_map (podman, arg_prefix, 1, extra_container_ids_start, num_extra_ids, container_id);
 }
 
+static gboolean
+is_port_range (const char *port)
+{
+  return g_regex_match_simple ("\\d+(-\\d+)?$", port, G_REGEX_DOLLAR_ENDONLY, G_REGEX_MATCH_ANCHORED);
+}
+
+
 static QuadUnitFile *
 convert_container (QuadUnitFile *container, GError **error)
 {
@@ -227,7 +234,7 @@ convert_container (QuadUnitFile *container, GError **error)
   long host_uid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "HostUser", uid), 0);
   long host_gid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "HostGroup", gid), 0);
 
-  if (uid != 0 && gid != 0)
+  if (uid != 0 || gid != 0)
     {
       quad_podman_add (podman, "--user");
       if (gid == 0)
@@ -316,11 +323,82 @@ convert_container (QuadUnitFile *container, GError **error)
       quad_podman_addf (podman, "%s:%s%s%s", source, dest, options ? ":" : "", options ? options : "");
     }
 
+  g_auto(GStrv) exposed_ports = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "ExposeHostPort");
+  for (guint i = 0; exposed_ports[i] != NULL; i++)
+    {
+      char *exposed_port = g_strchomp (exposed_ports[i]); /* Allow whitespace after */
+
+      if (!is_port_range (exposed_port))
+        {
+          quad_log ("Invalid port format '%s'", exposed_port);
+          continue;
+        }
+
+      quad_podman_addf (podman, "--expose=%s", exposed_port);
+    }
+
+  g_auto(GStrv) publish_ports = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "PublishPort");
+  for (guint i = 0; publish_ports[i] != NULL; i++)
+    {
+      char *publish_port = g_strchomp (publish_ports[i]); /* Allow whitespace after */
+      g_auto(GStrv) parts = g_strsplit (publish_port, ":", -1);
+      const char *container_port = NULL, *ip = NULL, *host_port = NULL;
+
+      /* format (from podman run): ip:hostPort:containerPort | ip::containerPort | hostPort:containerPort | containerPort */
+
+      switch (g_strv_length (parts))
+        {
+        case 1:
+          container_port = parts[0];
+          break;
+
+        case 2:
+          host_port = parts[0];
+          container_port = parts[1];
+          break;
+
+        case 3:
+          ip = parts[0];
+          host_port = parts[1];
+          container_port = parts[2];
+          break;
+
+        default:
+          quad_log ("Ignoring invalid published port '%s'", publish_port);
+          continue;
+        }
+
+      if (host_port && *host_port == 0)
+        host_port = NULL;
+
+      if (ip && strcmp (ip, "0.0.0.0") == 0)
+        ip = NULL;
+
+      if (host_port && !is_port_range (host_port))
+        {
+          quad_log ("Invalid port format '%s'", host_port);
+          continue;
+        }
+
+      if (container_port && !is_port_range (container_port))
+        {
+          quad_log ("Invalid port format '%s'", container_port);
+          continue;
+        }
+
+      if (ip)
+        quad_podman_addf (podman, "-p=%s:%s:%s", ip, host_port ? host_port : "", container_port);
+      else if (host_port)
+        quad_podman_addf (podman, "-p=%s:%s", host_port, container_port);
+      else
+        quad_podman_addf (podman, "-p=%s", container_port);
+    }
+
   quad_podman_add_env (podman, podman_env);
 
   quad_podman_add (podman, image);
 
-   g_autofree char *exec_key = quad_unit_file_lookup_last (container, CONTAINER_GROUP, "Exec");
+  g_autofree char *exec_key = quad_unit_file_lookup_last (container, CONTAINER_GROUP, "Exec");
   if (exec_key != NULL)
     {
       g_autoptr(GPtrArray) exec_args = quad_split_string (exec_key, WHITESPACE,
