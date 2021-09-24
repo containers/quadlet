@@ -9,6 +9,7 @@ project('quadlet', 'c',
 top_inc = include_directories('.')
 
 quadlet_prefix = get_option('prefix')
+quadlet_generatordir = join_paths(quadlet_prefix, quadlet_prefix, 'lib/systemd/system-generators')
 quadlet_sysconfdir = join_paths(quadlet_prefix, get_option('sysconfdir'), 'containers/systemd')
 
 config_h = configuration_data()
