@@ -624,6 +624,7 @@ static gboolean
 log_to_kmsg (const char *line)
 {
   static int dev_kmsg_fd = -2;
+  int res;
 
   if (dev_kmsg_fd == -2)
     dev_kmsg_fd = open ("/dev/kmsg", O_WRONLY);
@@ -631,7 +632,9 @@ log_to_kmsg (const char *line)
   if (dev_kmsg_fd < 0)
     return FALSE; /* Failed open */
 
-   write (dev_kmsg_fd, line, strlen (line));
+  res = write (dev_kmsg_fd, line, strlen (line));
+  if (res < 0)
+    return FALSE;
 
    return TRUE;
 }
