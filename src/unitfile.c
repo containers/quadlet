@@ -372,9 +372,16 @@ static void
 quad_unit_file_flush_pending_comments (QuadUnitFile *self,
                                        GPtrArray *to)
 {
-  g_ptr_array_extend (to, self->pending_comments, NULL, NULL);
-  while (self->pending_comments->len > 0)
-    g_ptr_array_steal_index (self->pending_comments, self->pending_comments->len -1);
+  gsize n_pending = self->pending_comments->len;
+
+  if (n_pending > 0)
+    {
+      g_autofree QuadUnitLine **pending = (QuadUnitLine **)g_ptr_array_free (self->pending_comments, FALSE);
+      self->pending_comments = g_ptr_array_new_with_free_func ((GDestroyNotify)quad_unit_line_free);
+
+      for (gsize i = 0; i < n_pending; i++)
+        g_ptr_array_add (to, pending[i]);
+    }
 }
 
 static gboolean
