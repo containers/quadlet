@@ -55,9 +55,9 @@ This is very similar to a regular systemd service file, except for the
 then exit only for systemd to restart it again.
 
 If you put this in `/etc/containers/systemd/minimal.container` and
-then run `systemctl daemon-reload` you can immediately start the
-container using `systemctl start minimal.service` and watch the
-status:
+then run `systemctl daemon-reload` and `podman pull centos` you can
+immediately start the container using `systemctl start
+minimal.service` and watch the status:
 
 ```
 # systemctl status minimal.service
