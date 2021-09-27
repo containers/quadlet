@@ -1,5 +1,5 @@
 Name:           quadlet
-Version:        0.1.0
+Version:        0.1.1
 Release:        1%{?dist}
 Summary:        Systemd container integration tool
 
