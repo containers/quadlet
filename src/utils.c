@@ -85,6 +85,8 @@ quad_apply_line_continuation (const char *raw_string)
   return g_string_free (str, FALSE);
 }
 
+/* This is based on code from systemd (src/basic/escape.c), marked LGPL-2.1-or-later and is copyrighted by the systemd developers */
+
 int
 cunescape_one (const char *p,
                gsize length,
@@ -279,6 +281,8 @@ cunescape_one (const char *p,
 
   return r;
 }
+
+/* This is based on code from systemd (src/basic/extract-workd.c), marked LGPL-2.1-or-later and is copyrighted by the systemd developers */
 
 static int
 extract_first_word (const char **p, char **ret, const char *separators, QuadSplitFlags flags)
