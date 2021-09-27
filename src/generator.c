@@ -30,6 +30,8 @@ static const char *supported_container_keys[] = {
   "HostGroup",
   "Volume",
   "PodmanArgs",
+  "Label",
+  "Annotation",
   NULL
 };
 static GHashTable *supported_container_keys_hash = NULL;
@@ -37,6 +39,7 @@ static GHashTable *supported_container_keys_hash = NULL;
 static const char *supported_volume_keys[] = {
   "User",
   "Group",
+  "Label",
   NULL
 };
 static GHashTable *supported_volume_keys_hash = NULL;
@@ -74,25 +77,25 @@ warn_for_unknown_keys (QuadUnitFile *unit,
 }
 
 static void
-parse_env_val (GHashTable *out,
+parse_key_val (GHashTable *out,
                const char *env_val)
 {
   char *eq = strchr (env_val, '=');
   if (eq != NULL)
     g_hash_table_insert (out, g_strndup (env_val, eq - env_val), g_strdup (eq+1));
   else
-    quad_log ("Invalid environment assignment '%s'", env_val);
+    quad_log ("Invalid key=value assignment '%s'", env_val);
 }
 
 static GHashTable *
-parse_env_keys (char **environments)
+parse_keys (char **key_vals)
 {
   GHashTable *res = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
-  for (int i = 0 ; environments[i] != NULL; i++)
+  for (int i = 0 ; key_vals[i] != NULL; i++)
     {
-      g_autoptr(GPtrArray) assigns = quad_split_string (environments[i], WHITESPACE, QUAD_SPLIT_RELAX|QUAD_SPLIT_UNQUOTE|QUAD_SPLIT_CUNESCAPE);
+      g_autoptr(GPtrArray) assigns = quad_split_string (key_vals[i], WHITESPACE, QUAD_SPLIT_RELAX|QUAD_SPLIT_UNQUOTE|QUAD_SPLIT_CUNESCAPE);
       for (guint j = 0; j < assigns->len; j++)
-        parse_env_val (res, g_ptr_array_index (assigns, j));
+        parse_key_val (res, g_ptr_array_index (assigns, j));
     }
   return res;
 }
@@ -188,7 +191,7 @@ convert_container (QuadUnitFile *container, GError **error)
 
   /* Read env early so we can override it below */
   g_auto(GStrv) environments = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "Environment");
-  g_autoptr(GHashTable) podman_env = parse_env_keys (environments);
+  g_autoptr(GHashTable) podman_env = parse_keys (environments);
 
   /* Need the containers filesystem mounted to start podman */
   quad_unit_file_add (service, UNIT_GROUP,
@@ -457,6 +460,14 @@ convert_container (QuadUnitFile *container, GError **error)
 
   quad_podman_add_env (podman, podman_env);
 
+  g_auto(GStrv) labels = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "Label");
+  g_autoptr(GHashTable) podman_labels = parse_keys (labels);
+  quad_podman_add_labels (podman, podman_labels);
+
+  g_auto(GStrv) annotations = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "Annotation");
+  g_autoptr(GHashTable) podman_annotations = parse_keys (annotations);
+  quad_podman_add_annotations (podman, podman_annotations);
+
   g_autofree char *podman_args_s = quad_unit_file_lookup_last (container, CONTAINER_GROUP, "PodmanArgs");
   if (podman_args_s != NULL)
     {
@@ -499,6 +510,9 @@ convert_volume (QuadUnitFile *container,
 
   g_autofree char *exec_cond = g_strdup_printf ("/usr/bin/bash -c \"! /usr/bin/podman volume exists %s\"", volume_name);
 
+  g_auto(GStrv) labels = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "Label");
+  g_autoptr(GHashTable) podman_labels = parse_keys (labels);
+
   g_autoptr(QuadPodman) podman = quad_podman_new ();
   quad_podman_addv (podman,
                     "volume", "create",
@@ -506,6 +520,7 @@ convert_volume (QuadUnitFile *container,
   quad_podman_addf (podman,
                     "o=uid=%ld,gid=%ld",
                     uid, gid);
+  quad_podman_add_labels (podman, podman_labels);
   quad_podman_add (podman,volume_name);
 
   g_autofree char *exec_start = quad_podman_to_exec (podman);

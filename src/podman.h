@@ -20,6 +20,10 @@ void        quad_podman_add_array (QuadPodman *podman,
                                    gsize len);
 void        quad_podman_add_env (QuadPodman *podman,
                                  GHashTable *envs);
+void        quad_podman_add_labels (QuadPodman *podman,
+                                    GHashTable *labels);
+void        quad_podman_add_annotations (QuadPodman *podman,
+                                         GHashTable *annotations);
 char *      quad_podman_to_exec (QuadPodman *podman);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (QuadPodman, quad_podman_free)

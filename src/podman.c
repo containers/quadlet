@@ -73,22 +73,44 @@ cmpstringp (const void *p1, const void *p2)
   return strcmp (*(char * const *) p1, *(char * const *) p2);
 }
 
-void
-quad_podman_add_env (QuadPodman *podman,
-                     GHashTable *env)
+static void
+quad_podman_add_keys (QuadPodman *podman,
+                      const char *arg,
+                      GHashTable *keys_ht)
 {
-  g_autofree char **keys = (char **)g_hash_table_get_keys_as_array (env, NULL);
+  g_autofree char **keys = (char **)g_hash_table_get_keys_as_array (keys_ht, NULL);
   qsort (keys, g_strv_length (keys), sizeof (const char *), cmpstringp);
   for (guint i = 0; keys[i] != NULL; i++)
     {
       const char *key = keys[i];
-      const char *value = g_hash_table_lookup (env, key);
+      const char *value = g_hash_table_lookup (keys_ht, key);
       if (value)
         {
-          quad_podman_add (podman, "--env");
+          quad_podman_add (podman, arg);
           quad_podman_addf (podman, "%s=%s", key, value);
         }
     }
+}
+
+void
+quad_podman_add_env (QuadPodman *podman,
+                     GHashTable *env)
+{
+  quad_podman_add_keys (podman, "--env", env);
+}
+
+void
+quad_podman_add_labels (QuadPodman *podman,
+                        GHashTable *labels)
+{
+  quad_podman_add_keys (podman, "--label", labels);
+}
+
+void
+quad_podman_add_annotations (QuadPodman *podman,
+                             GHashTable *annotations)
+{
+  quad_podman_add_keys (podman, "--annotation", annotations);
 }
 
 char *

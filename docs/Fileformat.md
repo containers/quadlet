@@ -36,6 +36,10 @@ section control the commandline options passed to podman.  However,
 some options also affect details of how systemd is set up to run and
 interact with the container.
 
+The podman container will have the same name as the unit, but with a
+`systemd-` prefix. I.e. a `$name.container` file will create a
+`$name.service` unit and a `systemd-$name` podman container.
+
 There is only one required key, `Image` which defines the container
 image that should be run by the service.
 
@@ -162,6 +166,15 @@ Supported keys in `Container` group are:
   of what these options to it can cause unexpected interactions, so
   it is ideally not recommended to use this.
 
+* `Label=`
+
+  Set one or more OCI labels on the container. The format is a list of
+  `key=value` items, similar to `Environment`.
+
+* `Annotation=`
+
+  Set one or more OCI annotations on the container. The format is a list of
+  `key=value` items, similar to `Environment`.
 
 # Volume files
 
@@ -188,3 +201,8 @@ Supported keys in `Volume` group are:
 * `Group=`
 
   The (numeric) host gid owner for the volume.
+
+* `Label=`
+
+  Set one or more OCI labels on the volume. The format is a list of
+  `key=value` items, similar to `Environment`.
