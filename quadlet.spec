@@ -8,6 +8,7 @@ URL:            https://github.com/containers/quadlet
 Source0:        %{url}/archive/%{version}/%{name}-%{version}.tar.gz
 
 BuildRequires:  meson
+BuildRequires:  gcc
 BuildRequires:  pkgconfig(glib-2.0) >= 2.44.0
 BuildRequires:  pkgconfig(gobject-2.0)
 
