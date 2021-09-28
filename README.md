@@ -101,5 +101,6 @@ read configuration files from `/etc/containers/systemd`.
 Here are some further documentations:
 
  * [File formats](./docs/Fileformat.md)
+ * [Container setup](./docs/ContainerSetup.md)
 
 Quadlet also ships with some [example containers](./examples).
