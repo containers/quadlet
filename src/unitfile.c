@@ -629,13 +629,25 @@ quad_unit_file_lookup_last (QuadUnitFile  *self,
   return quad_apply_line_continuation (raw);
 }
 
+char *
+quad_unit_file_lookup (QuadUnitFile  *self,
+                       const char    *group_name,
+                       const char    *key)
+{
+  char *val = quad_unit_file_lookup_last (self, group_name, key);
+  if (val == NULL)
+    return NULL;
+
+  return g_strchomp (val);
+}
+
 gboolean
 quad_unit_file_lookup_boolean (QuadUnitFile  *self,
                                const char    *group_name,
                                const char    *key,
                                gboolean       default_value)
 {
-  g_autofree char *val = quad_unit_file_lookup_last (self, group_name, key);
+  g_autofree char *val = quad_unit_file_lookup (self, group_name, key);
   if (val == NULL || *val == 0)
     return default_value;
 
@@ -654,7 +666,7 @@ quad_unit_file_lookup_int (QuadUnitFile  *self,
 {
   long res;
   char *endp;
-  g_autofree char *val = quad_unit_file_lookup_last (self, group_name, key);
+  g_autofree char *val = quad_unit_file_lookup (self, group_name, key);
   if (val == NULL || *val == 0)
     return default_value;
 
@@ -666,6 +678,43 @@ quad_unit_file_lookup_int (QuadUnitFile  *self,
   /* Otherwise return default value */
   return default_value;
 }
+
+uid_t
+quad_unit_file_lookup_uid (QuadUnitFile  *self,
+                           const char    *group_name,
+                           const char    *key,
+                           uid_t          default_value,
+                           GError       **error)
+{
+  g_autofree char *val = quad_unit_file_lookup (self, group_name, key);
+  if (val == NULL || *val == 0)
+    {
+      if (default_value == (uid_t)-1)
+        g_set_error (error, G_FILE_ERROR, G_FILE_ERROR_NOENT, "No key %s", key);
+      return default_value;
+    }
+
+  return quad_lookup_host_uid (val, error);
+}
+
+gid_t
+quad_unit_file_lookup_gid (QuadUnitFile  *self,
+                           const char    *group_name,
+                           const char    *key,
+                           gid_t          default_value,
+                           GError       **error)
+{
+  g_autofree char *val = quad_unit_file_lookup (self, group_name, key);
+  if (val == NULL || *val == 0)
+    {
+      if (default_value == (gid_t)-1)
+        g_set_error (error, G_FILE_ERROR, G_FILE_ERROR_NOENT, "No key %s", key);
+      return default_value;
+    }
+
+  return quad_lookup_host_gid (val, error);
+}
+
 
 const char **
 quad_unit_file_lookup_all_raw (QuadUnitFile *self,

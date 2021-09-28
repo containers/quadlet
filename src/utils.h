@@ -37,6 +37,12 @@ void                  quad_log                     (const char *fmt, ...) G_GNUC
 void                  quad_enable_debug            (void);
 void                  quad_debug                   (const char *fmt, ...) G_GNUC_PRINTF (1,2);
 
+uid_t                 quad_lookup_host_uid         (const char *user,
+                                                    GError    **error);
+gid_t                 quad_lookup_host_gid         (const char *group,
+                                                    GError    **error);
+
+
 #define _QUAD_CONCAT(a, b)  a##b
 #define _QUAD_CONCAT_INDIRECT(a, b) _QUAD_CONCAT(a, b)
 #define _QUAD_MAKE_ANONYMOUS(a) _QUAD_CONCAT_INDIRECT(a, __COUNTER__)

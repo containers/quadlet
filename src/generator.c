@@ -169,7 +169,7 @@ convert_container (QuadUnitFile *container, GError **error)
 
   warn_for_unknown_keys (container, CONTAINER_GROUP, supported_container_keys, &supported_container_keys_hash);
 
-  g_autofree char *image = quad_unit_file_lookup_last (container, CONTAINER_GROUP, "Image");
+  g_autofree char *image = quad_unit_file_lookup (container, CONTAINER_GROUP, "Image");
   if (image == NULL || image[0] == 0)
     {
       quad_fail (error, "No Image key specified");
@@ -177,7 +177,7 @@ convert_container (QuadUnitFile *container, GError **error)
     }
 
   /* Only allow mixed or control-group, as nothing else works well */
-  g_autofree char *kill_mode = quad_unit_file_lookup_last (service, SERVICE_GROUP, "KillMode");
+  g_autofree char *kill_mode = quad_unit_file_lookup (service, SERVICE_GROUP, "KillMode");
   if (kill_mode == NULL ||
       !(strcmp (kill_mode, "mixed") == 0 ||
         strcmp (kill_mode, "control-group") == 0))
@@ -293,18 +293,24 @@ convert_container (QuadUnitFile *container, GError **error)
       g_hash_table_insert (podman_env, g_strdup ("LISTEN_PID"), g_strdup ("2"));
     }
 
-  long uid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "User", 0), 0);
-  long gid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "Group", 0), 0);
-  long host_uid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "HostUser", uid), 0);
-  long host_gid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "HostGroup", gid), 0);
+  uid_t uid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "User", 0), 0);
+  gid_t gid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "Group", 0), 0);
+
+  uid_t host_uid = quad_unit_file_lookup_uid (container,CONTAINER_GROUP, "HostUser", 0, error);
+  if (host_uid == (uid_t)-1)
+    return NULL;
+
+  gid_t host_gid = quad_unit_file_lookup_gid (container,CONTAINER_GROUP, "HostGroup", 0, error);
+  if (host_gid == (gid_t)-1)
+    return NULL;
 
   if (uid != 0 || gid != 0)
     {
       quad_podman_add (podman, "--user");
       if (gid == 0)
-        quad_podman_addf (podman, "%ld", uid);
+        quad_podman_addf (podman, "%lu", (long unsigned)uid);
       else
-        quad_podman_addf (podman, "%ld:%ld", uid, gid);
+        quad_podman_addf (podman, "%lu:%lu", (long unsigned)uid, (long unsigned)gid);
     }
 
   /* TODO: Make this configurable */

@@ -29,6 +29,9 @@ const char *  quad_unit_file_lookup_last_raw (QuadUnitFile  *self,
 char *        quad_unit_file_lookup_last     (QuadUnitFile  *self,
                                               const char    *group_name,
                                               const char    *key);
+char *        quad_unit_file_lookup          (QuadUnitFile  *self,
+                                              const char    *group_name,
+                                              const char    *key); /* Strips trailing newlines */
 gboolean      quad_unit_file_lookup_boolean  (QuadUnitFile  *self,
                                               const char    *group_name,
                                               const char    *key,
@@ -37,6 +40,16 @@ long          quad_unit_file_lookup_int      (QuadUnitFile  *self,
                                               const char    *group_name,
                                               const char    *key,
                                               long           default_value);
+uid_t         quad_unit_file_lookup_uid      (QuadUnitFile  *self,
+                                              const char    *group_name,
+                                              const char    *key,
+                                              uid_t          default_value,
+                                              GError       **error);
+gid_t         quad_unit_file_lookup_gid      (QuadUnitFile  *self,
+                                              const char    *group_name,
+                                              const char    *key,
+                                              gid_t          default_value,
+                                              GError       **error);
 const char ** quad_unit_file_lookup_all_raw  (QuadUnitFile  *self,
                                               const char    *group_name,
                                               const char    *key);

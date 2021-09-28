@@ -77,8 +77,9 @@ Supported keys in `Container` group are:
 
 * `HostUser=`
 
-  The (numeric) host uid to run the container as. If this differs from
-  the uid in `User` then user namespaces are used to map the ids.
+  The host uid (numeric or a usernam) to run the container as. If this
+  differs from the uid in `User` then user namespaces are used to map
+  the ids.
 
 * `Group=`
 
@@ -88,8 +89,9 @@ Supported keys in `Container` group are:
 
 * `HostGroup=`
 
-  The (numeric) host gid to run the container as. If this differs from
-  the gid in `Group` then user namespaces are used to map the ids.
+  The host gid (numeric or group name) to run the container as. If
+  this differs from the gid in `Group` then user namespaces are used
+  to map the ids.
 
 * `AddCapability=`
 

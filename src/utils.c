@@ -5,7 +5,9 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <grp.h>
 #include <limits.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -683,4 +685,73 @@ quad_debug (const char *fmt, ...)
       quad_logv (fmt, args);
       va_end (args);
     }
+}
+
+uid_t
+quad_lookup_host_uid (const char *user,
+                      GError    **error)
+{
+  char *endp;
+  long long res;
+  struct passwd *pw;
+
+  /* First special case numeric ids */
+
+  res = strtoll (user, &endp, 10);
+
+  if (endp != user && *endp == 0)
+    {
+      /* On linux, uids are uint32 values, that can't be (uint32)-1 */
+      if (res < 0 || res > UINT32_MAX || res == (uid_t)-1)
+        {
+          quad_fail (error, "Invalid numerical uid '%s'", user);
+          return (uid_t)-1;
+        }
+
+      return res;
+    }
+
+  pw = getpwnam (user);
+  if (pw == NULL)
+    {
+      quad_fail (error, "Unknown user '%s'", user);
+      return (uid_t)-1;
+    }
+
+  return pw->pw_uid;
+}
+
+
+gid_t
+quad_lookup_host_gid (const char *group,
+                      GError    **error)
+{
+  char *endp;
+  long long res;
+  struct group *gp;
+
+  /* First special case numeric ids */
+
+  res = strtoll (group, &endp, 10);
+
+  if (endp != group && *endp == 0)
+    {
+      /* On linux, gids are uint32 values, that can't be (uint32)-1 */
+      if (res < 0 || res > UINT32_MAX || res == (gid_t)-1)
+        {
+          quad_fail (error, "Invalid numerical gid '%s'", group);
+          return (uid_t)-1;
+        }
+
+      return res;
+    }
+
+  gp = getgrnam (group);
+  if (gp == NULL)
+    {
+      quad_fail (error, "Unknown group '%s'", group);
+      return (uid_t)-1;
+    }
+
+  return gp->gr_gid;
 }
