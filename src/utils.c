@@ -756,6 +756,67 @@ quad_lookup_host_gid (const char *group,
   return gp->gr_gid;
 }
 
+static QuadRanges *
+quad_lookup_host_subid (const char *path,
+                         char ***cache,
+                         const char *prefix)
+{
+  g_autoptr(QuadRanges) ranges = quad_ranges_new_empty ();
+  static char *empty = { NULL };
+  char **lines;
+
+  if (*cache == NULL)
+    {
+      g_autofree char *data = NULL;
+
+      if (!g_file_get_contents (path, &data, NULL, NULL))
+        *cache = &empty;
+      else
+        *cache = g_strsplit (data, "\n", -1);
+    }
+
+  lines = *cache;
+  for (guint i = 0; lines[i] != NULL; i++)
+    {
+      const char *line = lines[i];
+
+      if (g_str_has_prefix (line, prefix) && line[strlen (prefix)] == ':')
+        {
+          g_auto(GStrv) parts = g_strsplit (line, ":", 3);
+
+          if (g_strv_length (parts) == 3)
+            {
+              long start = strtol (parts[1], NULL, 10);
+              long len = strtol (parts[2], NULL, 10);
+
+              if (start != 0 && len != 0)
+                quad_ranges_add (ranges, start, len);
+            }
+        }
+    }
+
+  if (ranges->n_ranges > 0)
+    return g_steal_pointer (&ranges);
+
+  return NULL;
+}
+
+QuadRanges *
+quad_lookup_host_subuid (const char *user)
+{
+  static char **cache = NULL;
+
+  return quad_lookup_host_subid ("/etc/subuid", &cache, user);
+}
+
+QuadRanges *
+quad_lookup_host_subgid (const char *user)
+{
+  static char **cache = NULL;
+
+  return quad_lookup_host_subid ("/etc/subgid", &cache, user);
+}
+
 QuadRanges *
 quad_ranges_new_empty (void)
 {
@@ -769,6 +830,15 @@ quad_ranges_new (guint32 start,
   QuadRanges *ranges = quad_ranges_new_empty ();
   quad_ranges_add (ranges, start, length);
   return ranges;
+}
+
+guint32
+quad_ranges_length (QuadRanges *ranges)
+{
+  guint32 length = 0;
+  for (guint32 i = 0; i < ranges->n_ranges; i++)
+    length += ranges->ranges[i].length;
+  return length;
 }
 
 QuadRanges *
@@ -880,6 +950,64 @@ quad_ranges_add (QuadRanges *ranges,
       ranges->n_ranges++;
     }
 }
+
+void
+quad_ranges_remove (QuadRanges *ranges,
+                    guint32 start,
+                    guint32 length)
+{
+  if (length == 0)
+    return;
+
+  for (guint32 i = 0; i < ranges->n_ranges; i++)
+    {
+      QuadRange *current = &ranges->ranges[i];
+      guint32 end = start + length;
+      guint32 current_start = current->start;
+      guint32 current_end = current->start + current->length;
+
+      if (end > current_start && start < current_end)
+        {
+          guint32 remaining_at_start = 0, remaining_at_end = 0;
+
+          if (start > current_start)
+            remaining_at_start = start - current_start;
+
+          if (end < current_end)
+            remaining_at_end = current_end - end;
+
+          if (remaining_at_start == 0 && remaining_at_end == 0)
+            {
+              /* Remove whole range */
+              memmove (ranges->ranges + i, ranges->ranges + i + 1, (ranges->n_ranges - i  - 1) * sizeof (QuadRange));
+              ranges->n_ranges--;
+              i--; /* undo loop iter */
+            }
+          else if (remaining_at_start != 0 && remaining_at_end != 0)
+            {
+              ranges->ranges = g_renew (QuadRange, ranges->ranges, ranges->n_ranges + 1);
+              memmove (ranges->ranges + i + 1, ranges->ranges + i, (ranges->n_ranges - i) * sizeof (QuadRange));
+              ranges->n_ranges++;
+              ranges->ranges[i].start = current_start;
+              ranges->ranges[i].length = remaining_at_start;
+              ranges->ranges[i+1].start = current_end - remaining_at_end;
+              ranges->ranges[i+1].length = remaining_at_end;
+              i++; /* double loop iter */
+            }
+          else if (remaining_at_start != 0)
+            {
+              ranges->ranges[i].start = current_start;
+              ranges->ranges[i].length = remaining_at_start;
+            }
+          else /* remaining_at_end != 0 */
+            {
+              ranges->ranges[i].start = current_end - remaining_at_end;
+              ranges->ranges[i].length = remaining_at_end;
+            }
+        }
+    }
+}
+
 
 void
 quad_ranges_merge (QuadRanges *ranges,

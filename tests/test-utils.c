@@ -263,6 +263,82 @@ test_range_multi (void)
     }
 }
 
+static void
+test_range_remove (void)
+{
+    g_autoptr(QuadRanges) base = quad_ranges_new (10, 10);
+    quad_ranges_add (base, 50, 10);
+    quad_ranges_add (base, 30, 10);
+
+    /* overlap all */
+    {
+      g_autoptr(QuadRanges) r = quad_ranges_copy (base);
+
+      quad_ranges_remove (r, 0, 100);
+
+      g_assert_cmpuint (r->n_ranges, ==, 0);
+    }
+
+    /* overlap middle 1 */
+    {
+      g_autoptr(QuadRanges) r = quad_ranges_copy (base);
+
+      quad_ranges_remove (r, 25, 20);
+
+      g_assert_cmpuint (r->n_ranges, ==, 2);
+      g_assert_cmpuint (r->ranges[0].start, ==, 10);
+      g_assert_cmpuint (r->ranges[0].length, ==, 10);
+      g_assert_cmpuint (r->ranges[1].start, ==, 50);
+      g_assert_cmpuint (r->ranges[1].length, ==, 10);
+    }
+
+    /* overlap middle 2 */
+    {
+      g_autoptr(QuadRanges) r = quad_ranges_copy (base);
+
+      quad_ranges_remove (r, 25, 10);
+
+      g_assert_cmpuint (r->n_ranges, ==, 3);
+      g_assert_cmpuint (r->ranges[0].start, ==, 10);
+      g_assert_cmpuint (r->ranges[0].length, ==, 10);
+      g_assert_cmpuint (r->ranges[1].start, ==, 35);
+      g_assert_cmpuint (r->ranges[1].length, ==, 5);
+      g_assert_cmpuint (r->ranges[2].start, ==, 50);
+      g_assert_cmpuint (r->ranges[2].length, ==, 10);
+    }
+
+    /* overlap middle 3 */
+    {
+      g_autoptr(QuadRanges) r = quad_ranges_copy (base);
+
+      quad_ranges_remove (r, 35, 10);
+
+      g_assert_cmpuint (r->n_ranges, ==, 3);
+      g_assert_cmpuint (r->ranges[0].start, ==, 10);
+      g_assert_cmpuint (r->ranges[0].length, ==, 10);
+      g_assert_cmpuint (r->ranges[1].start, ==, 30);
+      g_assert_cmpuint (r->ranges[1].length, ==, 5);
+      g_assert_cmpuint (r->ranges[2].start, ==, 50);
+      g_assert_cmpuint (r->ranges[2].length, ==, 10);
+    }
+
+    /* overlap middle 4 */
+    {
+      g_autoptr(QuadRanges) r = quad_ranges_copy (base);
+
+      quad_ranges_remove (r, 34, 2);
+
+      g_assert_cmpuint (r->n_ranges, ==, 4);
+      g_assert_cmpuint (r->ranges[0].start, ==, 10);
+      g_assert_cmpuint (r->ranges[0].length, ==, 10);
+      g_assert_cmpuint (r->ranges[1].start, ==, 30);
+      g_assert_cmpuint (r->ranges[1].length, ==, 4);
+      g_assert_cmpuint (r->ranges[2].start, ==, 36);
+      g_assert_cmpuint (r->ranges[2].length, ==, 4);
+      g_assert_cmpuint (r->ranges[3].start, ==, 50);
+      g_assert_cmpuint (r->ranges[3].length, ==, 10);
+    }
+}
 
 int
 main (int argc, char *argv[])
@@ -276,6 +352,7 @@ main (int argc, char *argv[])
   g_test_add_func ("/ranges/creation", test_range_creation);
   g_test_add_func ("/ranges/single", test_range_single);
   g_test_add_func ("/ranges/multi", test_range_multi);
+  g_test_add_func ("/ranges/remove", test_range_remove);
 
   return g_test_run ();
 }

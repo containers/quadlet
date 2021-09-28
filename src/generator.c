@@ -105,30 +105,12 @@ add_id_map (QuadPodman *podman,
             const char *arg_prefix,
             long container_id_start,
             long host_id_start,
-            long num_ids,
-            long reserved_container_id)
+            long num_ids)
 {
-  long num_before = num_ids;
-  long num_after = 0;
-
-  if (reserved_container_id >= container_id_start &&
-      reserved_container_id < container_id_start + num_ids)
-    {
-      /* reserved_container_id is in the middle, so we need to split the range */
-      num_before = reserved_container_id - container_id_start;
-      num_after = num_ids - num_before;
-    }
-
-  if (num_before != 0)
+  if (num_ids != 0)
     {
       quad_podman_add (podman, arg_prefix);
-      quad_podman_addf (podman, "%ld:%ld:%ld", container_id_start, host_id_start, num_before);
-    }
-
-  if (num_after != 0)
-    {
-      quad_podman_add (podman, arg_prefix);
-      quad_podman_addf (podman,"%ld:%ld:%ld", reserved_container_id + 1, host_id_start + num_before, num_after);
+      quad_podman_addf (podman, "%ld:%ld:%ld", container_id_start, host_id_start, num_ids);
     }
 }
 
@@ -137,20 +119,51 @@ add_id_maps (QuadPodman *podman,
              const char *arg_prefix,
              long container_id,
              long host_id,
-             long extra_container_ids_start,
-             long num_extra_ids)
+             QuadRanges *available_host_ids)
 {
+  g_autoptr(QuadRanges) container_ids = NULL;
+  g_autoptr(QuadRanges) all_uids = NULL;
+
+  if (available_host_ids == NULL)
+    {
+      /* Map everything by default */
+      all_uids = quad_ranges_new (1, UINT_MAX - 1);
+      available_host_ids = all_uids;
+    }
+
   /* Always map root to host root, otherwise the container uid mapping layer becomes huge because
    * most files are owned by root. Unless root was specifically chosen with User=0, then respect
    * HostUser set above. */
   if (container_id != 0)
-    add_id_map (podman, arg_prefix, 0, 0, 1, -1);
+    add_id_map (podman, arg_prefix, 0, 0, 1);
 
   /* Map uid to host_uid */
-  add_id_map (podman, arg_prefix, container_id, host_id, 1, -1);
+  add_id_map (podman, arg_prefix, container_id, host_id, 1);
 
-  /* Map the rest of the available extra ids (skipping container_id) */
-  add_id_map (podman, arg_prefix, 1, extra_container_ids_start, num_extra_ids, container_id);
+  /* Map the rest of available host ids from 1 and up, minus already used ids */
+  container_ids = quad_ranges_new (1, quad_ranges_length (available_host_ids));
+  quad_ranges_remove (container_ids, container_id, 1);
+
+  for (guint c_idx = 0; c_idx < container_ids->n_ranges && available_host_ids->n_ranges > 0; c_idx++)
+    {
+      QuadRange *c_range = &container_ids->ranges[c_idx];
+      guint32 c_start = c_range->start;
+      guint32 c_length = c_range->length;
+
+      while (c_length > 0)
+        {
+          QuadRange *h_range = &available_host_ids->ranges[0];
+          guint32 h_start = h_range->start;
+          guint32 h_length = h_range->length;
+
+          guint32 next_length = MIN (h_length, c_length);
+
+          add_id_map (podman, arg_prefix, c_start, h_start, next_length);
+          quad_ranges_remove (available_host_ids, h_start, next_length);
+          c_start += next_length;
+          c_length -= next_length;
+        }
+    }
 }
 
 static gboolean
@@ -313,11 +326,13 @@ convert_container (QuadUnitFile *container, GError **error)
         quad_podman_addf (podman, "%lu:%lu", (long unsigned)uid, (long unsigned)gid);
     }
 
-  /* TODO: Make this configurable */
-  long uid_map_host_start = 10000;
-  long uid_map_len = 1000;
-  long gid_map_host_start = 10000;
-  long gid_map_len = 1000;
+  g_autoptr(QuadRanges) uid_remap_ids = quad_lookup_host_subuid (QUADLET_USERNAME);
+  if (uid_remap_ids == NULL) /* Fall back to built-in default */
+    uid_remap_ids = quad_ranges_new (QUADLET_FALLBACK_UID_START, QUADLET_FALLBACK_UID_LENGTH);
+
+  g_autoptr(QuadRanges) gid_remap_ids = quad_lookup_host_subgid (QUADLET_USERNAME);
+  if (gid_remap_ids == NULL) /* Fall back to built-in default */
+    gid_remap_ids = quad_ranges_new (QUADLET_FALLBACK_GID_START, QUADLET_FALLBACK_GID_LENGTH);
 
   gboolean no_usermap = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "NoUsermap", FALSE);
   if (no_usermap)
@@ -326,21 +341,19 @@ convert_container (QuadUnitFile *container, GError **error)
          main user/group is remapped, even if most ids map one-to-one. */
       if (uid != host_uid)
         add_id_maps (podman, "--uidmap",
-                     uid, host_uid,
-                     1, UINT_MAX - 1);
+                     uid, host_uid, NULL);
       if (gid != host_gid)
         add_id_maps (podman, "--gidmap",
-                     uid, host_uid,
-                     1, UINT_MAX - 1);
+                     uid, host_uid, NULL);
     }
   else
     {
       add_id_maps (podman, "--uidmap",
                    uid, host_uid,
-                   uid_map_host_start, uid_map_len);
+                   uid_remap_ids);
       add_id_maps (podman, "--gidmap",
                    gid, host_gid,
-                   gid_map_host_start, gid_map_len);
+                   gid_remap_ids);
     }
 
   g_auto(GStrv) volumes = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "Volume");
