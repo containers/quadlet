@@ -42,6 +42,28 @@ uid_t                 quad_lookup_host_uid         (const char *user,
 gid_t                 quad_lookup_host_gid         (const char *group,
                                                     GError    **error);
 
+typedef struct {
+  guint32 start;
+  guint32 length;
+} QuadRange;
+
+typedef struct {
+  QuadRange *ranges; /* Sorted, disjoint */
+  guint32 n_ranges;
+} QuadRanges;
+
+QuadRanges *quad_ranges_new (guint32 start,
+                             guint32 length);
+QuadRanges *quad_ranges_new_empty (void);
+QuadRanges *quad_ranges_copy (QuadRanges *ranges);
+void quad_ranges_free (QuadRanges *ranges);
+void quad_ranges_add (QuadRanges *ranges,
+                      guint32 start,
+                      guint32 length);
+void quad_ranges_merge (QuadRanges *ranges,
+                        QuadRanges *other);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (QuadRanges, quad_ranges_free)
 
 #define _QUAD_CONCAT(a, b)  a##b
 #define _QUAD_CONCAT_INDIRECT(a, b) _QUAD_CONCAT(a, b)

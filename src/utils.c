@@ -755,3 +755,136 @@ quad_lookup_host_gid (const char *group,
 
   return gp->gr_gid;
 }
+
+QuadRanges *
+quad_ranges_new_empty (void)
+{
+  return g_new0 (QuadRanges, 1);
+}
+
+QuadRanges *
+quad_ranges_new (guint32 start,
+                 guint32 length)
+{
+  QuadRanges *ranges = quad_ranges_new_empty ();
+  quad_ranges_add (ranges, start, length);
+  return ranges;
+}
+
+QuadRanges *
+quad_ranges_copy (QuadRanges *ranges)
+{
+  QuadRanges *new = g_new (QuadRanges, 1);
+  new->ranges = g_new (QuadRange, ranges->n_ranges);
+  memcpy (new->ranges, ranges->ranges, sizeof(QuadRange) * ranges->n_ranges);
+  new->n_ranges = ranges->n_ranges;
+  return new;
+}
+
+void
+quad_ranges_free (QuadRanges *ranges)
+{
+  g_free (ranges->ranges);
+  g_free (ranges);
+}
+
+void
+quad_ranges_add (QuadRanges *ranges,
+                 guint32 start,
+                 guint32 length)
+{
+  if (length == 0)
+    return;
+
+  for (guint32 i = 0; i < ranges->n_ranges; i++)
+    {
+      QuadRange *current = &ranges->ranges[i];
+
+      /* Check if new range starts before current */
+      if (start < current->start)
+        {
+          /* Check if new range is completely before current */
+          if (start + length < current->start)
+            {
+              ranges->ranges = g_renew (QuadRange, ranges->ranges, ranges->n_ranges + 1);
+              memmove (ranges->ranges + i + 1, ranges->ranges + i, (ranges->n_ranges - i) * sizeof (QuadRange));
+              ranges->n_ranges++;
+              ranges->ranges[i].start = start;
+              ranges->ranges[i].length = length;
+
+              return; /* All done */
+            }
+
+          /* ranges overlap, extend current backward to new start */
+          guint32 to_extend_len = current->start - start;
+          current->start -= to_extend_len;
+          current->length += to_extend_len;
+
+          /* And drop the extended part from new range */
+          start += to_extend_len;
+          length -= to_extend_len;
+
+          if (length == 0)
+            return; /* That was all */
+
+          /* Move on to next case */
+        }
+
+      if (start >= current->start && start < current->start + current->length)
+        {
+          /* New range overlaps current */
+          if (start + length <= current->start + current->length)
+            {
+              return; /* All overlapped, we're done */
+            }
+
+          /* New range extends past end of current */
+
+          guint32 overlap_len = (current->start + current->length) - start;
+
+          /* And drop the overlapped part from current range */
+          start += overlap_len;
+          length -= overlap_len;
+
+          /* Move on to next case */
+        }
+
+      if (start == current->start + current->length)
+        {
+          /* We're extending current */
+          current->length += length;
+
+          /* Might have to merge some old remaining ranges */
+          while (i + 1 < ranges->n_ranges &&
+                 ranges->ranges[i+1].start < current->start + current->length)
+            {
+              QuadRange *next = &ranges->ranges[i+1];
+
+              guint32 new_end = MAX (current->start + current->length, next->start + next->length);
+
+              current->length = new_end - current->start;
+              memmove (ranges->ranges + i + 1, ranges->ranges + i + 2, (ranges->n_ranges - i  - 2) * sizeof (QuadRange));
+              ranges->n_ranges--;
+            }
+
+          return; /* All done */
+        }
+    }
+
+  /* New range remaining after last old range, append */
+  if (length > 0)
+    {
+      ranges->ranges = g_renew (QuadRange, ranges->ranges, ranges->n_ranges + 1);
+      ranges->ranges[ranges->n_ranges].start = start;
+      ranges->ranges[ranges->n_ranges].length = length;
+      ranges->n_ranges++;
+    }
+}
+
+void
+quad_ranges_merge (QuadRanges *ranges,
+                   QuadRanges *other)
+{
+  for (guint32 i = 0; i < other->n_ranges; i++)
+    quad_ranges_add (ranges, other->ranges[i].start, other->ranges[i].length);
+}
