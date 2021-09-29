@@ -77,7 +77,7 @@ Supported keys in `Container` group are:
 
 * `HostUser=`
 
-  The host uid (numeric or a usernam) to run the container as. If this
+  The host uid (numeric or a username) to run the container as. If this
   differs from the uid in `User` then user namespaces are used to map
   the ids.
 
