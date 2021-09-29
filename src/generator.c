@@ -227,7 +227,7 @@ convert_container (QuadUnitFile *container, GError **error)
 
   /* Remove the cid file, to avoid confusion as the container is no longer running. */
   quad_unit_file_add (service, SERVICE_GROUP,
-                      "ExecStartPost", "-rm -f %t/%N.cid");
+                      "ExecStopPost", "-rm -f %t/%N.cid");
 
   g_autoptr(QuadPodman) podman = quad_podman_new ();
 
