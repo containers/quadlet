@@ -290,7 +290,7 @@ convert_container (QuadUnitFile *container, GError **error)
     {
       char *caps = g_strdup (add_caps[i]);
       for (guint j = 0; caps[j] != 0; j++)
-        caps[j] = g_ascii_toupper (caps[j]);
+        caps[j] = g_ascii_tolower (caps[j]);
       quad_podman_addf (podman, "--cap-add=%s", caps);
     }
 
