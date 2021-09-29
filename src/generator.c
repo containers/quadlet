@@ -313,11 +313,11 @@ convert_container (QuadUnitFile *container, GError **error)
   uid_t uid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "User", 0), 0);
   gid_t gid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "Group", 0), 0);
 
-  uid_t host_uid = quad_unit_file_lookup_uid (container,CONTAINER_GROUP, "HostUser", 0, error);
+  uid_t host_uid = quad_unit_file_lookup_uid (container,CONTAINER_GROUP, "HostUser", uid, error);
   if (host_uid == (uid_t)-1)
     return NULL;
 
-  gid_t host_gid = quad_unit_file_lookup_gid (container,CONTAINER_GROUP, "HostGroup", 0, error);
+  gid_t host_gid = quad_unit_file_lookup_gid (container,CONTAINER_GROUP, "HostGroup", gid, error);
   if (host_gid == (gid_t)-1)
     return NULL;
 
