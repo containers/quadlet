@@ -131,18 +131,22 @@ add_id_maps (QuadPodman *podman,
       available_host_ids = all_uids;
     }
 
-  /* Always map root to host root, otherwise the container uid mapping layer becomes huge because
-   * most files are owned by root. Unless root was specifically chosen with User=0, then respect
-   * HostUser set above. */
-  if (container_id != 0)
-    add_id_map (podman, arg_prefix, 0, 0, 1);
+  /* We want to remap all the early uids linearly to the available host ids initially.
+   * Below we also remove ids that are used by other mappings. */
+  container_ids = quad_ranges_new (0, UINT_MAX - 1);
 
-  /* Map uid to host_uid */
+  /* Always map specified uid to specified host_uid */
   add_id_map (podman, arg_prefix, container_id, host_id, 1);
-
-  /* Map the rest of available host ids from 1 and up, minus already used ids */
-  container_ids = quad_ranges_new (1, quad_ranges_length (available_host_ids));
   quad_ranges_remove (container_ids, container_id, 1);
+
+  /* Always map root to host root, otherwise the container uid mapping layer becomes huge because
+   * most files are owned by root. Unless root was specifically chosen with User=0, or HostUser=0
+   * which would conflict with this mapping. */
+  if (container_id != 0 && host_id != 0)
+    {
+      add_id_map (podman, arg_prefix, 0, 0, 1);
+      quad_ranges_remove (container_ids, 0, 1);
+    }
 
   for (guint c_idx = 0; c_idx < container_ids->n_ranges && available_host_ids->n_ranges > 0; c_idx++)
     {
@@ -150,7 +154,7 @@ add_id_maps (QuadPodman *podman,
       guint32 c_start = c_range->start;
       guint32 c_length = c_range->length;
 
-      while (c_length > 0)
+      while (c_length > 0 && available_host_ids->n_ranges > 0)
         {
           QuadRange *h_range = &available_host_ids->ranges[0];
           guint32 h_start = h_range->start;
