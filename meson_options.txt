@@ -1,0 +1,22 @@
+option('quadlet-user',
+       description: 'The name of the quadlet user, used to find available subuids and subgids',
+       type: 'string',
+       value: 'quadlet')
+
+option('fallback-uidstart',
+       description: 'Start of fallback uid remap range (when quadlet user has no subuid)',
+       type: 'integer',
+       value: 1879048192)
+option('fallback-uidlen',
+       description: 'Length of fallback uid remap range (when quadlet user has no subuid)',
+       type: 'integer',
+       value: 65536)
+
+option('fallback-gidstart',
+       description: 'Start of fallback gid remap range (when quadlet user has no subgid)',
+       type: 'integer',
+       value: 1879048192)
+option('fallback-gidlen',
+       description: 'Length of fallback gid remap range (when quadlet user has no subgid)',
+       type: 'integer',
+       value: 65536)
