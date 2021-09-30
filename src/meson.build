@@ -25,7 +25,7 @@ generator_sources = [
   'generator.c',
 ]
 
-executable('quadlet-generator', generator_sources,
+quadlet_generator = executable('quadlet-generator', generator_sources,
   dependencies: libquadlet_dep,
   install: true,
   install_dir : quadlet_generatordir,
