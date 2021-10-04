@@ -9,9 +9,9 @@ project('quadlet', 'c',
 top_inc = include_directories('.')
 
 quadlet_prefix = get_option('prefix')
-quadlet_generatordir = join_paths(quadlet_prefix, quadlet_prefix, 'lib/systemd/system-generators')
+quadlet_generatordir = join_paths(quadlet_prefix, 'lib/systemd/system-generators')
 quadlet_admin_containersdir = join_paths(quadlet_prefix, get_option('sysconfdir'), 'containers')
-quadlet_distro_containersdir = join_paths(quadlet_prefix, quadlet_prefix, 'share/containers')
+quadlet_distro_containersdir = join_paths(quadlet_prefix, get_option('datadir'), 'containers')
 
 config_h = configuration_data()
 config_h.set_quoted('PACKAGE_VERSION', meson.project_version())
