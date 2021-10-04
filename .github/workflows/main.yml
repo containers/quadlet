@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install meson
-        run: sudo apt-get install -y meson ninja-build
+        run: sudo apt-get install -y meson ninja-build valgrind
       - uses: actions/setup-python@v2
         with:
           python-version: '3.x'
@@ -23,10 +23,12 @@ jobs:
         env:
           CC: gcc
       - run: meson test -C builddir/ -v
+      - run: meson test --wrap='valgrind --error-exitcode=1 --show-possibly-lost=no' -C builddir/ -v utils
       - uses: actions/upload-artifact@v2
         if: failure()
         with:
           name: test-logs
           path: |
             builddir/meson-logs/testlog.txt
+            builddir/meson-logs/testlog-valgrind.txt
             builddir/meson-logs/meson-log.txt

@@ -77,13 +77,16 @@ class Testcase:
             os.mkdir(outdir)
 
             write_file (indir, testcase.filename, self.data);
-            res = subprocess.run([generator_bin, outdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env = {
+            cmd = [generator_bin, outdir]
+            if use_valgrind:
+                cmd = ["valgrind", "--error-exitcode=1", "--leak-check=full", "--show-possibly-lost=no", "--errors-for-leak-kinds=definite"] + cmd
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env = {
                 "QUADLET_UNIT_DIRS": indir
             })
             self.stdout = res.stdout.decode('utf8')
             # The generator should never fail, just log warnings
             if res.returncode != 0:
-                self.fail(f"Unexpected generator failure\n")
+                self.fail(f"Unexpected generator failure\n" + self.stdout)
 
             servicepath = os.path.join(outdir, self.servicename)
             if self.expect_fail:
@@ -164,6 +167,10 @@ if len(sys.argv) < 3:
     sys.exit(1)
 generator_bin = sys.argv[2]
 
+use_valgrind = False
+if len(sys.argv) >= 4 and sys.argv[3] == '--valgrind':
+    use_valgrind = True
+
 testcases = []
 for de in os.scandir(testcases_dir):
     name = de.name
@@ -172,7 +179,10 @@ for de in os.scandir(testcases_dir):
 testcases.sort(key = lambda testcase: testcase.filename)
 
 for testcase in testcases:
-    print (f"Running testcase {testcase.filename}")
+    in_valgrind = ""
+    if use_valgrind:
+        in_valgrind = " (in valgrind)"
+    print (f"Running testcase {testcase.filename}{in_valgrind}")
     testcase.run()
 
     for check in testcase.checks:
