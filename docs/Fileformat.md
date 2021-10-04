@@ -168,6 +168,8 @@ Supported keys in `Container` group are:
   of what these options to it can cause unexpected interactions, so
   it is ideally not recommended to use this.
 
+  This key can be listed multiple  times.
+
 * `Label=`
 
   Set one or more OCI labels on the container. The format is a list of
