@@ -67,6 +67,9 @@ class Testcase:
         self.unit = {}
         self.podman_args = []
 
+    def lookup(self, group, key):
+        return self.sections.get(group, {}).get(key, None)
+
     def run(self):
         res = None
         outdata = {}
@@ -102,7 +105,6 @@ class Testcase:
     def fail(self, msg):
         print(f"Failed testcase {self.filename}: {msg}")
         if self.outdata:
-            print(self.podman_args)
             print(f"-------- {self.servicename}----------")
             print(self.outdata)
             print(f"------------------")
@@ -150,9 +152,20 @@ def assert_podman_args(args, testcase):
 def assert_podman_final_args(args, testcase):
     return match_sublist_at(testcase.podman_args, len(testcase.podman_args) - len(args), args)
 
+def assert_key_is(args, testcase):
+    if len(args) < 3:
+        return False
+    group = args[0]
+    key = args[1]
+    values = args[2:]
+
+    real_values = testcase.lookup(group, key)
+    return real_values == values
+
 ops = {
     "assert-failed": assert_failed,
     "assert-stderr-contains": assert_stderr_contains,
+    "assert-key-is": assert_key_is,
     "assert-podman-args": assert_podman_args,
     "assert-podman-final-args": assert_podman_final_args,
 }
