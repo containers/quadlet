@@ -77,10 +77,9 @@ class Testcase:
             os.mkdir(outdir)
 
             write_file (indir, testcase.filename, self.data);
-            res = subprocess.run([generator_bin, outdir], capture_output=True, env = {
+            res = subprocess.run([generator_bin, outdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env = {
                 "QUADLET_UNIT_DIRS": indir
             })
-            self.stderr = res.stderr.decode('utf8')
             self.stdout = res.stdout.decode('utf8')
             # The generator should never fail, just log warnings
             if res.returncode != 0:
@@ -140,7 +139,7 @@ def assert_failed(args, testcase):
     return True # We already handled this specially after running
 
 def assert_stderr_contains(args, testcase):
-    return args[0] in testcase.stderr or args[0] in testcase.stdout
+    return args[0] in testcase.stdout
 
 def assert_podman_args(args, testcase):
     return find_sublist(testcase.podman_args, args) != -1
