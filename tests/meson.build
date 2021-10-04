@@ -13,4 +13,4 @@ test('utils test', test_utils, env: tests_environment)
 testcase_runner = find_program ('testcase-runner.py')
 test('generator', testcase_runner,
      args: [join_paths(meson.current_source_dir(), 'cases'),
-            quadlet_generator.path()])
+            quadlet_generator])
