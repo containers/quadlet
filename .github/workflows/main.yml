@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install meson
+        run: sudo apt-get install -y meson ninja-build
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+      - run: meson setup builddir/
+        env:
+          CC: gcc
+      - run: meson test -C builddir/ -v
+      - uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: test-logs
+          path: |
+            builddir/meson-logs/testlog.txt
+            builddir/meson-logs/meson-log.txt
