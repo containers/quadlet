@@ -495,9 +495,10 @@ convert_container (QuadUnitFile *container, GError **error)
   g_autoptr(GHashTable) podman_annotations = parse_keys (annotations);
   quad_podman_add_annotations (podman, podman_annotations);
 
-  g_autofree char *podman_args_s = quad_unit_file_lookup_last (container, CONTAINER_GROUP, "PodmanArgs");
-  if (podman_args_s != NULL)
+  g_auto(GStrv) podman_argsv = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "PodmanArgs");
+  for (guint i = 0; podman_argsv[i] != NULL; i++)
     {
+      char *podman_args_s = podman_argsv[i];
       g_autoptr(GPtrArray) podman_args = quad_split_string (podman_args_s, WHITESPACE,
                                                             QUAD_SPLIT_RELAX|QUAD_SPLIT_UNQUOTE);
       quad_podman_add_array (podman, (const char **)podman_args->pdata, podman_args->len);
