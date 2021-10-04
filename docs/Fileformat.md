@@ -175,10 +175,14 @@ Supported keys in `Container` group are:
   Set one or more OCI labels on the container. The format is a list of
   `key=value` items, similar to `Environment`.
 
+  This key can be listed multiple  times.
+
 * `Annotation=`
 
   Set one or more OCI annotations on the container. The format is a list of
   `key=value` items, similar to `Environment`.
+
+  This key can be listed multiple  times.
 
 # Volume files
 
@@ -210,3 +214,5 @@ Supported keys in `Volume` group are:
 
   Set one or more OCI labels on the volume. The format is a list of
   `key=value` items, similar to `Environment`.
+
+  This key can be listed multiple  times.
