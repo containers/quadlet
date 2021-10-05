@@ -679,6 +679,39 @@ quad_unit_file_lookup_int (QuadUnitFile  *self,
   return default_value;
 }
 
+QuadRanges *
+quad_unit_file_lookup_ranges (QuadUnitFile  *self,
+                              const char    *group_name,
+                              const char    *key,
+                              QuadRangeLookupFunc name_lookup,
+                              QuadRanges    *default_value)
+{
+  g_autofree char *val = quad_unit_file_lookup (self, group_name, key);
+  if (val == NULL)
+    {
+      if (default_value)
+        return quad_ranges_copy (default_value);
+      else
+        return quad_ranges_new_empty ();
+    }
+
+  if (*val == 0)
+    return quad_ranges_new_empty ();
+
+  if (!g_ascii_isdigit (val[0]))
+    {
+      if (name_lookup)
+        {
+          QuadRanges *res = name_lookup (val);
+          if (res)
+            return res;
+        }
+      return quad_ranges_new_empty ();
+    }
+
+  return quad_ranges_parse (val);
+}
+
 uid_t
 quad_unit_file_lookup_uid (QuadUnitFile  *self,
                            const char    *group_name,
