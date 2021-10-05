@@ -26,6 +26,9 @@ void          quad_unit_file_set_path        (QuadUnitFile  *self,
                                               const char    *path);
 void          quad_unit_file_print           (QuadUnitFile  *self,
                                               GString       *str);
+gboolean      quad_unit_file_has_key         (QuadUnitFile  *self,
+                                              const char    *group_name,
+                                              const char    *key);
 const char *  quad_unit_file_lookup_last_raw (QuadUnitFile  *self,
                                               const char    *group_name,
                                               const char    *key);

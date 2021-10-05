@@ -617,6 +617,14 @@ quad_unit_file_lookup_last_raw (QuadUnitFile *self,
   return NULL;
 }
 
+gboolean
+quad_unit_file_has_key (QuadUnitFile  *self,
+                        const char    *group_name,
+                        const char    *key)
+{
+  return quad_unit_file_lookup_last_raw (self, group_name, key) != NULL;
+}
+
 char *
 quad_unit_file_lookup_last (QuadUnitFile  *self,
                             const char    *group_name,
