@@ -57,6 +57,7 @@ QuadRanges *          quad_lookup_host_subgid      (const char *user);
 QuadRanges *quad_ranges_new (guint32 start,
                              guint32 length);
 QuadRanges *quad_ranges_new_empty (void);
+QuadRanges *quad_ranges_parse (const char *ranges);
 QuadRanges *quad_ranges_copy (QuadRanges *ranges);
 void quad_ranges_free (QuadRanges *ranges);
 void quad_ranges_add (QuadRanges *ranges,

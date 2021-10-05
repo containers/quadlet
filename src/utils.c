@@ -832,6 +832,50 @@ quad_ranges_new (guint32 start,
   return ranges;
 }
 
+QuadRanges *
+quad_ranges_parse (const char *ranges)
+{
+  QuadRanges *res = quad_ranges_new_empty ();
+  g_auto(GStrv) rangesv = g_strsplit (ranges, ",", -1);
+  for (int i = 0; rangesv[i] != NULL; i++)
+    {
+      char *start_s = rangesv[i];
+      char *end_s;
+      long long start, end;
+
+      end_s = strchr (start_s, '-');
+      if (end_s)
+        {
+          *end_s = 0;
+          end_s++;
+        }
+      else
+        end_s = start_s + strlen (start_s);
+
+      start = strtoll (start_s, NULL, 10);
+      if (start < 0)
+        start = 0;
+      if (start > UINT32_MAX)
+        start = UINT32_MAX;
+
+      if (*end_s == 0)
+        end = UINT32_MAX;
+      else
+        {
+          end = strtoll (end_s, NULL, 10);
+          if (end < 0)
+            end = 0;
+          if (end > UINT32_MAX)
+            end = UINT32_MAX;
+        }
+
+      if (end >= start)
+        quad_ranges_add (res, start, MIN(end - start + 1, UINT32_MAX));
+    }
+
+  return res;
+}
+
 guint32
 quad_ranges_length (QuadRanges *ranges)
 {
