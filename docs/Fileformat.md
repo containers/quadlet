@@ -93,10 +93,24 @@ Supported keys in `Container` group are:
   this differs from the gid in `Group` then user namespaces are used
   to map the ids. If unspecified this defaults to what was specified in `Group`.
 
+* `NoNewPrivileges=` (defaults to `yes`)
+
+  If enabled (which is the default) this disables the container
+  processes from gaining additional privileges via things like
+  setuid and file capabilieities.
+
+* `DropCapability=` (defaults to `all`)
+
+   Drop these capabilities from the default container capability set.
+   The default is `all`, so you have to add any capabilities you want
+   with `AddCapability`. Set this to empty to drop no capabilities.
+   This can be listed multiple times.
+
 * `AddCapability=`
 
-   By default the container runs with no capabilities, if any are
-   needed you can list add them with this key. For example using
+   By default the container runs with no capabilities (due to
+   DropCapabilities='all'), if any specific caps are needed you can
+   list add them with this key. For example using
    `AddCapability=CAP_DAC_OVERRIDE`. This can be listed multiple
    times.
 
@@ -154,6 +168,20 @@ Supported keys in `Container` group are:
    If this is true, then the file descriptors and environment variables for socket activation
    is passed to the container. This is only needed for older versions of podman, since podman
    was [recently made to handle this automatically](https://github.com/containers/podman/pull/11316).
+
+* `Timezone=` (default to `local`)
+
+   The timezone to run the container in.
+
+* `RunInit=` (default to `yes`)
+
+   If enabled (and it is by default), the container will have a
+   minimal init process inside the container that forwards signals and
+   reaps processes.
+
+* `VolatileTmp=` (default to `yes`)
+
+   If enabled (and it is by default), the container will have a fresh tmpfs mounted on `/tmp`.
 
 * `Volume=`
 

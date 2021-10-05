@@ -18,6 +18,8 @@ static const char *supported_container_keys[] = {
   "Image",
   "Environment",
   "Exec",
+  "NoNewPrivileges",
+  "DropCapability",
   "AddCapability",
   "RemapUsers",
   "RemapUidStart",
@@ -36,6 +38,9 @@ static const char *supported_container_keys[] = {
   "PodmanArgs",
   "Label",
   "Annotation",
+  "RunInit",
+  "VolatileTmp",
+  "Timezone",
   NULL
 };
 static GHashTable *supported_container_keys_hash = NULL;
@@ -50,6 +55,11 @@ static GHashTable *supported_volume_keys_hash = NULL;
 
 static QuadRanges *default_remap_uids = NULL;
 static QuadRanges *default_remap_gids = NULL;
+
+const char *default_drop_caps[] = {
+  "all",
+  NULL
+};
 
 static void
 warn_for_unknown_keys (QuadUnitFile *unit,
@@ -275,14 +285,9 @@ convert_container (QuadUnitFile *container, GError **error)
                      * TODO: Once available we want to use the passthrough log-driver instead. */
                     "--log-driver", "journald",
 
-                    /* Run with a pid1 init to reap zombies (as most apps don't) */
-                    "--init",
-
                     /* Never try to pull the image during service start */
                     "--pull=never",
 
-                    /* Use the host timezone */
-                    "--tz=local",
                     NULL);
 
   /* We use crun as the runtime and delegated groups to it */
@@ -291,6 +296,19 @@ convert_container (QuadUnitFile *container, GError **error)
                     "--runtime", "/usr/bin/crun",
                     "--cgroups=split",
                     NULL);
+
+  g_autofree char *timezone =  quad_unit_file_lookup (container, CONTAINER_GROUP, "Timezone");
+  /* Use the host timezone by default*/
+  if (timezone == NULL)
+    timezone = g_strdup ("local");
+  if (*timezone != 0)
+    quad_podman_addf (podman, "--tz=%s", timezone);
+
+  /* Run with a pid1 init to reap zombies by default (as most apps don't do that) */
+  gboolean run_init = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "RunInit", TRUE);
+  if (run_init)
+    quad_podman_addv (podman, "--init", NULL);
+
 
   /* By default we handle startup notification with conmon, but allow passing it to the container with Notify=yes */
   gboolean notify = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "Notify", FALSE);
@@ -303,26 +321,42 @@ convert_container (QuadUnitFile *container, GError **error)
                        "NotifyAccess", "all",
                        NULL);
 
-  quad_unit_file_set (service, SERVICE_GROUP, "SyslogIdentifier", "%N");
+  if (!quad_unit_file_has_key (container, SERVICE_GROUP, "SyslogIdentifier"))
+    quad_unit_file_set (service, SERVICE_GROUP, "SyslogIdentifier", "%N");
 
   /* Default to no higher level privileges or caps */
-  quad_podman_addv (podman,
-                    "--security-opt=no-new-privileges",
-                    "--cap-drop=all",
-                    NULL);
+  gboolean no_new_privileges = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "NoNewPrivileges", TRUE);
+  if (no_new_privileges)
+    quad_podman_addv (podman, "--security-opt=no-new-privileges", NULL);
+
+  const char **drop_caps;
+  g_auto(GStrv) drop_caps_opts = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "DropCapability");
+  if (quad_unit_file_has_key (container, CONTAINER_GROUP, "DropCapability"))
+    drop_caps = (const char **)drop_caps_opts;
+  else
+    drop_caps = default_drop_caps;
+  for (guint i = 0; drop_caps[i] != NULL; i++)
+    {
+      g_autofree char *caps = g_strdup (drop_caps[i]);
+      for (guint j = 0; caps[j] != 0; j++)
+        caps[j] = g_ascii_tolower (caps[j]);
+      quad_podman_addf (podman, "--cap-drop=%s", caps);
+    }
 
   /* But allow overrides with AddCapability*/
   g_auto(GStrv) add_caps = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "AddCapability");
   for (guint i = 0; add_caps[i] != NULL; i++)
     {
-      char *caps = g_strdup (add_caps[i]);
+      g_autofree char *caps = g_strdup (add_caps[i]);
       for (guint j = 0; caps[j] != 0; j++)
         caps[j] = g_ascii_tolower (caps[j]);
       quad_podman_addf (podman, "--cap-add=%s", caps);
     }
 
   /* We want /tmp to be a tmpfs, like on rhel host */
-  quad_podman_addv (podman, "--mount", "type=tmpfs,tmpfs-size=512M,destination=/tmp", NULL);
+  gboolean volatile_tmp = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "VolatileTmp", TRUE);
+  if (volatile_tmp)
+    quad_podman_addv (podman, "--mount", "type=tmpfs,tmpfs-size=512M,destination=/tmp", NULL);
 
   gboolean socket_activated = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "SocketActivated", FALSE);
   if (socket_activated)
