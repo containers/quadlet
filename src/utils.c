@@ -866,6 +866,15 @@ quad_ranges_add (QuadRanges *ranges,
   if (length == 0)
     return;
 
+  /* The maximum value we can store is UINT32_MAX-1, because if start
+   * is 0 and length is UINT32_MAX, then the first non-range item is
+   * 0+UINT32_MAX. So, we limit the start and length here so all
+   * elements in the ranges are in this area.
+   */
+  if (start == UINT32_MAX)
+    return;
+  length = MIN (length, UINT32_MAX - start);
+
   for (guint32 i = 0; i < ranges->n_ranges; i++)
     {
       QuadRange *current = &ranges->ranges[i];
