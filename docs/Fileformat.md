@@ -70,7 +70,7 @@ Supported keys in `Container` group are:
   to match the uid on the host, which can be set with `HostUser`, but
   if that is not specified the uid is used on the host.
 
-  Note that by default (unless `NoUsermap` is set) all other host
+  Note that by default (unless `RemapUsers` is set to false) all other host
   users are unmapped in the container, and the user is run without any
   capabilities (even if uid is 0), any required capabilities must be
   granted with `AddCapability`.
@@ -100,13 +100,47 @@ Supported keys in `Container` group are:
    `AddCapability=CAP_DAC_OVERRIDE`. This can be listed multiple
    times.
 
-* `NoUsermap=`
+* `RemapUsers=` (defaults to `yes`)
 
-   If this is set to to true, then host user and group ids are not remapped
-   in the container, except as needed to handle the case where User and HostUser,
-   or Group and HostUser differs.
+   If this is enabled (which is the default), then host user and group
+   ids are remapped in the container, such that all the uids starting
+   at `RemapUidStart` (and gids starting at `RemapGidStart`) in the
+   container are chosen from the available host uids specified by
+   `RemapUidRanges` (and `RemapGidRanges`).
 
-* `Notify=`
+* `RemapUidStart=` (defaults to `1`)
+
+   If `RemapUsers` is available, this is the first uid that is
+   remapped, and all lower uids are mapped to the equivalent host
+   uid. This defaults to 1, so that the host root uid is in the
+   container, as this means a lot less file ownership remapping in the
+   container image.
+
+* `RemapGidStart=` (defaults to `1`)
+
+   If `RemapUsers` is available, this is the first gid that is
+   remapped, and all lower gids are mapped to the equivalent host
+   gid. This defaults to 1, so that the host root gid is in the
+   container, as this means a lot less file ownership remapping in the
+   container image.
+
+* `RemapUidRanges=`
+
+   This specifies a comma-separated list of ranges (like `10000-20000,40000-50000`) of
+   available host uids to use to remap container uids in `RemapUsers`. Alternatively
+   it can be a username, which means the available subuids of that user will be used.
+   If not specified, the default ranges are chosen as the subuids of the `quadlet`
+   user.
+
+* `RemapGidRanges=`
+
+   This specifies a comma-separated list of ranges (like `10000-20000,40000-50000`) of
+   available host gids to use to remap container gids in `RemapUsers`. Alternatively
+   it can be a username, which means the available subgids of that user will be used.
+   If not specified, the default ranges are chosen as the subgids of the `quadlet`
+   user.
+
+* `Notify=` (defaults to `no`)
 
    By default podman is run in such a way that systemd startup notify is handled
    by the container runtime. In other words, the service is deemed started when
@@ -115,7 +149,7 @@ Supported keys in `Container` group are:
    then setting `Notify`to true will pass the notification details to the container
    allowing it to notify of startup on its own.
 
-* `SocketActivated=`
+* `SocketActivated=` (defaults to `no`)
 
    If this is true, then the file descriptors and environment variables for socket activation
    is passed to the container. This is only needed for older versions of podman, since podman
