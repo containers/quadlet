@@ -19,7 +19,11 @@ static const char *supported_container_keys[] = {
   "Environment",
   "Exec",
   "AddCapability",
-  "NoUsermap",
+  "RemapUsers",
+  "RemapUidStart",
+  "RemapGidStart",
+  "RemapUidRanges",
+  "RemapGidRanges",
   "Notify",
   "SocketActivated",
   "ExposeHostPort",
@@ -43,6 +47,9 @@ static const char *supported_volume_keys[] = {
   NULL
 };
 static GHashTable *supported_volume_keys_hash = NULL;
+
+static QuadRanges *default_remap_uids = NULL;
+static QuadRanges *default_remap_gids = NULL;
 
 static void
 warn_for_unknown_keys (QuadUnitFile *unit,
@@ -119,38 +126,54 @@ add_id_maps (QuadPodman *podman,
              const char *arg_prefix,
              long container_id,
              long host_id,
+             long remap_start_id,
              QuadRanges *available_host_ids)
 {
-  g_autoptr(QuadRanges) container_ids = NULL;
+  g_autoptr(QuadRanges) unmapped_ids = NULL;
+  g_autoptr(QuadRanges) mapped_ids = NULL;
   g_autoptr(QuadRanges) all_uids = NULL;
 
   if (available_host_ids == NULL)
     {
       /* Map everything by default */
-      all_uids = quad_ranges_new (1, UINT_MAX - 1);
+      all_uids = quad_ranges_new (0, UINT_MAX - 1);
       available_host_ids = all_uids;
     }
 
-  /* We want to remap all the early uids linearly to the available host ids initially.
-   * Below we also remove ids that are used by other mappings. */
-  container_ids = quad_ranges_new (0, UINT_MAX - 1);
+  /* Map the first ids up to remap_start_id to the host equivalent */
+  unmapped_ids = quad_ranges_new (0, remap_start_id);
+
+  /* The rest we want to map to available_host_ids. Note that this
+   * overlaps unmapped_ids, because below we may remove ranges from
+   * unmapped ids and we want to backfill those. */
+  mapped_ids = quad_ranges_new (0, UINT_MAX);
 
   /* Always map specified uid to specified host_uid */
   add_id_map (podman, arg_prefix, container_id, host_id, 1);
-  quad_ranges_remove (container_ids, container_id, 1);
 
-  /* Always map root to host root, otherwise the container uid mapping layer becomes huge because
-   * most files are owned by root. Unless root was specifically chosen with User=0, or HostUser=0
-   * which would conflict with this mapping. */
-  if (container_id != 0 && host_id != 0)
+  /* We no longer want to map this container id as its already mapped*/
+  quad_ranges_remove (mapped_ids, container_id, 1);
+  quad_ranges_remove (unmapped_ids, container_id, 1);
+
+  /* But also, we don't want to use the *host* id again, as we can only map it once  */
+  quad_ranges_remove (unmapped_ids, host_id, 1);
+  quad_ranges_remove (available_host_ids, host_id, 1);
+
+  /* Map unmapped ids to equivalent host range, and remove from mapped_ids to avoid double-mapping */
+  for (guint idx = 0; idx < unmapped_ids->n_ranges; idx++)
     {
-      add_id_map (podman, arg_prefix, 0, 0, 1);
-      quad_ranges_remove (container_ids, 0, 1);
+      QuadRange *range = &unmapped_ids->ranges[idx];
+      guint32 start = range->start;
+      guint32 length = range->length;
+
+      add_id_map (podman, arg_prefix, start, start, length);
+      quad_ranges_remove (mapped_ids, start, length);
+      quad_ranges_remove (available_host_ids, start, length);
     }
 
-  for (guint c_idx = 0; c_idx < container_ids->n_ranges && available_host_ids->n_ranges > 0; c_idx++)
+  for (guint c_idx = 0; c_idx < mapped_ids->n_ranges && available_host_ids->n_ranges > 0; c_idx++)
     {
-      QuadRange *c_range = &container_ids->ranges[c_idx];
+      QuadRange *c_range = &mapped_ids->ranges[c_idx];
       guint32 c_start = c_range->start;
       guint32 c_length = c_range->length;
 
@@ -334,34 +357,33 @@ convert_container (QuadUnitFile *container, GError **error)
         quad_podman_addf (podman, "%lu:%lu", (long unsigned)uid, (long unsigned)gid);
     }
 
-  g_autoptr(QuadRanges) uid_remap_ids = quad_lookup_host_subuid (QUADLET_USERNAME);
-  if (uid_remap_ids == NULL) /* Fall back to built-in default */
-    uid_remap_ids = quad_ranges_new (QUADLET_FALLBACK_UID_START, QUADLET_FALLBACK_UID_LENGTH);
-
-  g_autoptr(QuadRanges) gid_remap_ids = quad_lookup_host_subgid (QUADLET_USERNAME);
-  if (gid_remap_ids == NULL) /* Fall back to built-in default */
-    gid_remap_ids = quad_ranges_new (QUADLET_FALLBACK_GID_START, QUADLET_FALLBACK_GID_LENGTH);
-
-  gboolean no_usermap = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "NoUsermap", FALSE);
-  if (no_usermap)
+  gboolean remap_users = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "RemapUsers", TRUE);
+  if (!remap_users)
     {
       /* No remapping of users, although we still need maps if the
          main user/group is remapped, even if most ids map one-to-one. */
       if (uid != host_uid)
         add_id_maps (podman, "--uidmap",
-                     uid, host_uid, NULL);
+                     uid, host_uid, 0, NULL);
       if (gid != host_gid)
         add_id_maps (podman, "--gidmap",
-                     uid, host_uid, NULL);
+                     uid, host_uid, 0, NULL);
     }
   else
     {
+      g_autoptr(QuadRanges) uid_remap_ids = quad_unit_file_lookup_ranges (container, CONTAINER_GROUP, "RemapUidRanges",
+                                                                          quad_lookup_host_subuid, default_remap_uids);
+      g_autoptr(QuadRanges) gid_remap_ids = quad_unit_file_lookup_ranges (container, CONTAINER_GROUP, "RemapGidRanges",
+                                                                          quad_lookup_host_subgid, default_remap_gids);
+      guint32 remap_uid_start = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "RemapUidStart", 1), 0);
+      guint32 remap_gid_start = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "RemapGidStart", 1), 0);
+
       add_id_maps (podman, "--uidmap",
                    uid, host_uid,
-                   uid_remap_ids);
+                   remap_uid_start, uid_remap_ids);
       add_id_maps (podman, "--gidmap",
                    gid, host_gid,
-                   gid_remap_ids);
+                   remap_gid_start, gid_remap_ids);
     }
 
   g_auto(GStrv) volumes = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "Volume");
@@ -676,6 +698,14 @@ main (int argc,
   output_path = argv[1];
 
   quad_debug ("Starting quadlet-generator, output to: %s", output_path);
+
+  default_remap_uids = quad_lookup_host_subuid (QUADLET_USERNAME);
+  if (default_remap_uids == NULL) /* Fall back to built-in default */
+    default_remap_uids = quad_ranges_new (QUADLET_FALLBACK_UID_START, QUADLET_FALLBACK_UID_LENGTH);
+
+  default_remap_gids = quad_lookup_host_subgid (QUADLET_USERNAME);
+  if (default_remap_gids == NULL) /* Fall back to built-in default */
+    default_remap_gids = quad_ranges_new (QUADLET_FALLBACK_GID_START, QUADLET_FALLBACK_GID_LENGTH);
 
   source_paths  = quad_get_unit_dirs ();
 
