@@ -1,12 +1,15 @@
 #pragma once
 
 #include <glib-object.h>
+#include <utils.h>
 
 G_BEGIN_DECLS
 
 #define QUAD_TYPE_UNIT_FILE (quad_unit_file_get_type())
 
 G_DECLARE_FINAL_TYPE (QuadUnitFile, quad_unit_file, QUAD, UNIT_FILE, GObject)
+
+typedef QuadRanges *  (*QuadRangeLookupFunc) (const char *name);
 
 QuadUnitFile *quad_unit_file_new_from_path (const char  *path,
                                             GError     **error);
@@ -50,6 +53,11 @@ gid_t         quad_unit_file_lookup_gid      (QuadUnitFile  *self,
                                               const char    *key,
                                               gid_t          default_value,
                                               GError       **error);
+QuadRanges * quad_unit_file_lookup_ranges    (QuadUnitFile  *self,
+                                              const char    *group_name,
+                                              const char    *key,
+                                              QuadRangeLookupFunc name_lookup,
+                                              QuadRanges    *default_value);
 const char ** quad_unit_file_lookup_all_raw  (QuadUnitFile  *self,
                                               const char    *group_name,
                                               const char    *key);
