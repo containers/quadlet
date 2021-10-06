@@ -203,7 +203,7 @@ for testcase in testcases:
         args = check[1:]
         invert = False
         if op[0] == '!':
-            invert = true;
+            invert = True;
             op = op[1:]
         if not op in ops:
             testcase.fail(f"unknown assertion {op}");
