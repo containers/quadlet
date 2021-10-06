@@ -5,6 +5,7 @@
 #include <podman.h>
 #include <utils.h>
 #include <locale.h>
+#include <stdint.h>
 
 #define UNIT_GROUP "Unit"
 #define SERVICE_GROUP "Service"
@@ -120,34 +121,34 @@ parse_keys (char **key_vals)
 static void
 add_id_map (QuadPodman *podman,
             const char *arg_prefix,
-            long container_id_start,
-            long host_id_start,
-            long num_ids)
+            guint32 container_id_start,
+            guint32 host_id_start,
+            guint32 num_ids)
 {
   if (num_ids != 0)
     {
       quad_podman_add (podman, arg_prefix);
-      quad_podman_addf (podman, "%ld:%ld:%ld", container_id_start, host_id_start, num_ids);
+      quad_podman_addf (podman, "%"G_GUINT32_FORMAT":%"G_GUINT32_FORMAT":%"G_GUINT32_FORMAT, container_id_start, host_id_start, num_ids);
     }
 }
 
 static void
 add_id_maps (QuadPodman *podman,
              const char *arg_prefix,
-             long container_id,
-             long host_id,
-             long remap_start_id,
+             guint32 container_id,
+             guint32 host_id,
+             guint32 remap_start_id,
              QuadRanges *available_host_ids)
 {
   g_autoptr(QuadRanges) unmapped_ids = NULL;
   g_autoptr(QuadRanges) mapped_ids = NULL;
-  g_autoptr(QuadRanges) all_uids = NULL;
+  g_autoptr(QuadRanges) no_uids = NULL;
 
   if (available_host_ids == NULL)
     {
       /* Map everything by default */
-      all_uids = quad_ranges_new (0, UINT_MAX - 1);
-      available_host_ids = all_uids;
+      no_uids = quad_ranges_new_empty ();
+      available_host_ids = no_uids;
     }
 
   /* Map the first ids up to remap_start_id to the host equivalent */
@@ -156,7 +157,7 @@ add_id_maps (QuadPodman *podman,
   /* The rest we want to map to available_host_ids. Note that this
    * overlaps unmapped_ids, because below we may remove ranges from
    * unmapped ids and we want to backfill those. */
-  mapped_ids = quad_ranges_new (0, UINT_MAX);
+  mapped_ids = quad_ranges_new (0, UINT32_MAX);
 
   /* Always map specified uid to specified host_uid */
   add_id_map (podman, arg_prefix, container_id, host_id, 1);
@@ -398,10 +399,10 @@ convert_container (QuadUnitFile *container, GError **error)
          main user/group is remapped, even if most ids map one-to-one. */
       if (uid != host_uid)
         add_id_maps (podman, "--uidmap",
-                     uid, host_uid, 0, NULL);
+                     uid, host_uid, UINT32_MAX, NULL);
       if (gid != host_gid)
         add_id_maps (podman, "--gidmap",
-                     uid, host_uid, 0, NULL);
+                     gid, host_gid, UINT32_MAX, NULL);
     }
   else
     {
