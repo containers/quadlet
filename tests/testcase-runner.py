@@ -97,7 +97,7 @@ class Testcase:
                     self.fail("Unexpected success")
             else:
                 if not os.path.isfile(servicepath):
-                    self.fail(f"Unexpected failure, can't find {servicepath}")
+                    self.fail(f"Unexpected failure, can't find {servicepath}\n" + self.stdout)
                 self.outdata = read_file(outdir, self.servicename)
                 self.sections = parse_unitfile(canonicalize_unitfile(self.outdata))
                 self.podman_args = shlex.split(self.sections.get("Service", {}).get("ExecStart", ["podman"])[0])
