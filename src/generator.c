@@ -519,7 +519,7 @@ convert_container (QuadUnitFile *container, GError **error)
       if (host_port && *host_port == 0)
         host_port = NULL;
 
-      if (ip && strcmp (ip, "0.0.0.0") == 0)
+      if (ip && (strcmp (ip, "0.0.0.0") == 0 || *ip == 0))
         ip = NULL;
 
       if (host_port && !is_port_range (host_port))
