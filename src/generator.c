@@ -599,7 +599,7 @@ convert_volume (QuadUnitFile *container,
 
   g_autofree char *exec_cond = g_strdup_printf ("/usr/bin/bash -c \"! /usr/bin/podman volume exists %s\"", volume_name);
 
-  g_auto(GStrv) labels = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "Label");
+  g_auto(GStrv) labels = quad_unit_file_lookup_all (container, VOLUME_GROUP, "Label");
   g_autoptr(GHashTable) podman_labels = parse_keys (labels);
 
   g_autoptr(QuadPodman) podman = quad_podman_new ();
