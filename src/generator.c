@@ -587,9 +587,6 @@ convert_volume (QuadUnitFile *container,
 
   warn_for_unknown_keys (container, VOLUME_GROUP, supported_volume_keys, &supported_volume_keys_hash);
 
-  long uid = MAX (quad_unit_file_lookup_int (container, VOLUME_GROUP, "User", 0), 0);
-  long gid = MAX (quad_unit_file_lookup_int (container, VOLUME_GROUP, "Group", 0), 0);
-
   /* Rename old Volume group to x-Volume so that systemd ignores it */
   quad_unit_file_rename_group (service, VOLUME_GROUP, X_VOLUME_GROUP);
 
@@ -604,11 +601,29 @@ convert_volume (QuadUnitFile *container,
 
   g_autoptr(QuadPodman) podman = quad_podman_new ();
   quad_podman_addv (podman,
-                    "volume", "create",
-                    "--opt", NULL);
-  quad_podman_addf (podman,
-                    "o=uid=%ld,gid=%ld",
-                    uid, gid);
+                    "volume", "create", NULL);
+
+  g_autoptr(GString) opts = g_string_new ("o=");
+
+  if (quad_unit_file_has_key (container, VOLUME_GROUP, "User"))
+    {
+      long uid = MAX (quad_unit_file_lookup_int (container, VOLUME_GROUP, "User", 0), 0);
+      if (opts->len > 2)
+        g_string_append (opts, ",");
+      g_string_append_printf (opts, "uid=%ld", uid);
+    }
+
+  if (quad_unit_file_has_key (container, VOLUME_GROUP, "Group"))
+    {
+      long gid = MAX (quad_unit_file_lookup_int (container, VOLUME_GROUP, "Group", 0), 0);
+      if (opts->len > 2)
+        g_string_append (opts, ",");
+      g_string_append_printf (opts, "gid=%ld", gid);
+    }
+
+  if (opts->len > 2)
+    quad_podman_addv (podman, "--opt", opts->str, NULL);
+
   quad_podman_add_labels (podman, podman_labels);
   quad_podman_add (podman,volume_name);
 
