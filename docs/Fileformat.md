@@ -266,11 +266,11 @@ Supported keys in `Volume` group are:
 
 * `User=`
 
-  The (numeric) host uid owner for the volume.
+  The host (numeric) uid, or user name to use as owner for the volume
 
 * `Group=`
 
-  The (numeric) host gid owner for the volume.
+  The host (numeric) gid, or group name to use as group for the volume
 
 * `Label=`
 
