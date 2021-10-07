@@ -164,19 +164,20 @@ Here are some things that are set up:
   reaps zombied children. This is necessary because most programs are
   not programmed to reap the child processes they launch, instead
   relying on pid 1 to do this. But when run as pid 1 of in container
-  there is no other reaper around.
+  there is no other reaper around. This can be overridden with
+  `RunInit=no`.
 
 * `--mount type=tmpfs,tmpfs-size=512M,destination=/tmp`
 
   This makes /tmp in the container be a tmpfs, similar to how it is set
-  up on the host.
+  up on the host. This can be overridden with `VolatileTmp=no`.
 
 * `--tz=local`
 
   This sets the timezone of the container to match whatever the host os
   uses. For distributed host-isolated services it makes sense to always
   run in UTC, but for a system service we want to be as close as
-  possible to the host.
+  possible to the host. This can be overridden with `Timnezone=`.
 
 * `--pull=never`
 
@@ -189,6 +190,7 @@ Here are some things that are set up:
   Most apps need no special capabilities, so default to none unless
   specifically needed. If some special capability is needed it you
   can add thes using e.g. `AddCapability=CAP_DAC_OVERRIDE`.
+  This can be overridden with `DropCapability=`.
 
 
 * `--security-opt=no-new-privileges`
@@ -197,6 +199,7 @@ Here are some things that are set up:
   This disables all forms of setuid like features that allows the process to
   gain privileges it didn't initially have. Unless the app has very specific
   needs this is a good default for security reasons.
+  This can be overridden with `NoNewPrivileges=no`.
 
 # Uid/Gid mapping
 
@@ -214,7 +217,9 @@ mapping takes both time and diskspace. For this reason, and because
 most container files are owned by root, quadlet defaults to mapping
 host uid 0 to 0 in the container, making the ownership mapping layers
 small. Due to the limited permissions quadlet defaults to, mapping the
-root user into the container should be safe.
+root user into the container should be safe. The default can be
+overridden with `RemapUsers=no` which will map the host uid/gids
+directly to the container.
 
 Due to the above 0-to-0 mapping, the recommended approach is to
 construct container images that run as a standardized *non-root* user,
