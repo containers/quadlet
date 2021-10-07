@@ -593,6 +593,10 @@ convert_volume (QuadUnitFile *container,
   /* Rename old Volume group to x-Volume so that systemd ignores it */
   quad_unit_file_rename_group (service, VOLUME_GROUP, X_VOLUME_GROUP);
 
+  /* Need the containers filesystem mounted to start podman */
+  quad_unit_file_add (service, UNIT_GROUP,
+                      "RequiresMountsFor", "%t/containers");
+
   g_autofree char *exec_cond = g_strdup_printf ("/usr/bin/bash -c \"! /usr/bin/podman volume exists %s\"", volume_name);
 
   g_auto(GStrv) labels = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "Label");
