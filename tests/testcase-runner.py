@@ -162,10 +162,22 @@ def assert_key_is(args, testcase):
     real_values = testcase.lookup(group, key)
     return real_values == values
 
+def assert_key_contains(args, testcase):
+    if len(args) != 3:
+        return False
+    group = args[0]
+    key = args[1]
+    value = args[2]
+
+    real_values = testcase.lookup(group, key)
+    last_value = real_values[len(real_values)-1]
+    return value in last_value
+
 ops = {
     "assert-failed": assert_failed,
     "assert-stderr-contains": assert_stderr_contains,
     "assert-key-is": assert_key_is,
+    "assert-key-contains": assert_key_contains,
     "assert-podman-args": assert_podman_args,
     "assert-podman-final-args": assert_podman_final_args,
 }
