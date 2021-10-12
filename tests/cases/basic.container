@@ -22,6 +22,7 @@
 ## assert-key-is "Service" "SyslogIdentifier" "%N"
 ## assert-key-is "Service" "ExecStartPre" "-rm -f %t/%N.cid"
 ## assert-key-is "Service" "ExecStopPost" "-/usr/bin/podman rm -f -i --cidfile=%t/%N.cid" "-rm -f %t/%N.cid"
+## assert-key-is "Service" "Environment" "PODMAN_SYSTEMD_UNIT=%n"
 
 [Container]
 Image=imagename
