@@ -227,6 +227,10 @@ convert_container (QuadUnitFile *container, GError **error)
       return NULL;
     }
 
+  /* Set PODMAN_SYSTEMD_UNIT so that podman auto-update can restart the service. */
+  quad_unit_file_add (service, SERVICE_GROUP,
+                      "Environment", "PODMAN_SYSTEMD_UNIT=%n");
+
   /* Only allow mixed or control-group, as nothing else works well */
   g_autofree char *kill_mode = quad_unit_file_lookup (service, SERVICE_GROUP, "KillMode");
   if (kill_mode == NULL ||
