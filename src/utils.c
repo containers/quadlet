@@ -15,12 +15,16 @@
 #include <stdint.h>
 
 const char **
-quad_get_unit_dirs (void)
+quad_get_unit_dirs (gboolean user)
 {
   static const char **unit_dirs = NULL;
-  static const char *unit_dirs_default[] = {
+  static const char *unit_dirs_system_default[] = {
     QUADLET_UNIT_DIR_ADMIN,
     QUADLET_UNIT_DIR_DISTRO,
+    NULL
+  };
+  static const char *unit_dirs_user_default[] = {
+    NULL,
     NULL
   };
 
@@ -30,7 +34,17 @@ quad_get_unit_dirs (void)
       if (unit_dirs_env != NULL)
         unit_dirs = (const char **)g_strsplit (unit_dirs_env, ":", -1);
       else
-        unit_dirs = unit_dirs_default;
+        {
+          if (user)
+            {
+              unit_dirs_user_default[0] = g_build_filename (g_get_user_config_dir (), "containers/systemd", NULL);
+              unit_dirs = unit_dirs_user_default;
+            }
+          else
+            {
+              unit_dirs = unit_dirs_system_default;
+            }
+        }
     }
 
   return unit_dirs;
