@@ -28,5 +28,13 @@ generator_sources = [
 quadlet_generator = executable('quadlet-generator', generator_sources,
   dependencies: libquadlet_dep,
   install: true,
-  install_dir : quadlet_generatordir,
+  install_dir : quadlet_libexecdir,
 )
+
+quadlet_generator_installed_path = join_paths(quadlet_libexecdir, 'quadlet-generator')
+
+meson.add_install_script('mkdir', '-p',
+                         '$DESTDIR' / quadlet_user_generatordir,
+                         '$DESTDIR' / quadlet_system_generatordir)
+meson.add_install_script('ln', '-sfr', '$DESTDIR' / quadlet_generator_installed_path, '$DESTDIR' / quadlet_user_generatordir  / 'quadlet-user-generator')
+meson.add_install_script('ln', '-sfr', '$DESTDIR' / quadlet_generator_installed_path, '$DESTDIR' / quadlet_user_generatordir  / 'quadlet-system-generator')

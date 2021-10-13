@@ -26,6 +26,12 @@ to the generated systemd service file, so can contain any normal
 systemd configuration. The custom section is also visible in the
 generated file, but with a `X-` prefix which means systemd ignores it.
 
+Quadlet also supports `systemd --user` unit. Any quadlet files stored
+in `$XDG_CONFIG_HOME/containers/systemd` (default is
+`~/.config/containers/systemd`) will be converted to user systemd
+services. These work more or less the same as the regular system
+units, with some exceptions when it comes to uid mappings (see below).
+
 # Container files
 
 Container files are named with a `.container` extension and contain a
@@ -114,13 +120,13 @@ Supported keys in `Container` group are:
    `AddCapability=CAP_DAC_OVERRIDE`. This can be listed multiple
    times.
 
-* `RemapUsers=` (defaults to `yes`)
+* `RemapUsers=` (defaults to `yes` for system units, always `no` on user units)
 
-   If this is enabled (which is the default), then host user and group
-   ids are remapped in the container, such that all the uids starting
-   at `RemapUidStart` (and gids starting at `RemapGidStart`) in the
-   container are chosen from the available host uids specified by
-   `RemapUidRanges` (and `RemapGidRanges`).
+   If this is enabled (which is the default for system units), then
+   host user and group ids are remapped in the container, such that
+   all the uids starting at `RemapUidStart` (and gids starting at
+   `RemapGidStart`) in the container are chosen from the available
+   host uids specified by `RemapUidRanges` (and `RemapGidRanges`).
 
 * `RemapUidStart=` (defaults to `1`)
 
@@ -153,6 +159,11 @@ Supported keys in `Container` group are:
    it can be a username, which means the available subgids of that user will be used.
    If not specified, the default ranges are chosen as the subgids of the `quadlet`
    user.
+
+* `KeepId=` (defaults to `no`, only works for user units)
+
+   If this is enabled, then the user uid will be mapped to itself in the container,
+   otherwise it is mapped to root. This is ignored for system units.
 
 * `Notify=` (defaults to `no`)
 

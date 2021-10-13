@@ -6,6 +6,7 @@
 #include <utils.h>
 #include <locale.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #define UNIT_GROUP "Unit"
 #define SERVICE_GROUP "Service"
@@ -31,6 +32,7 @@ static const char *supported_container_keys[] = {
   "SocketActivated",
   "ExposeHostPort",
   "PublishPort",
+  "KeepUser",
   "User",
   "Group",
   "HostUser",
@@ -56,6 +58,8 @@ static GHashTable *supported_volume_keys_hash = NULL;
 
 static QuadRanges *default_remap_uids = NULL;
 static QuadRanges *default_remap_gids = NULL;
+
+static gboolean quad_is_user = FALSE;
 
 const char *default_drop_caps[] = {
   "all",
@@ -376,8 +380,23 @@ convert_container (QuadUnitFile *container, GError **error)
       g_hash_table_insert (podman_env, g_strdup ("LISTEN_PID"), g_strdup ("2"));
     }
 
-  uid_t uid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "User", 0), 0);
-  gid_t gid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "Group", 0), 0);
+  uid_t default_container_uid = 0;
+  gid_t default_container_gid = 0;
+
+  gboolean keep_id = FALSE;
+  if (quad_is_user)
+    {
+      keep_id = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "KeepId", FALSE);
+      if (keep_id)
+        {
+          default_container_uid = getuid ();
+          default_container_gid = getgid ();
+          quad_podman_addv (podman, "--userns", "keep-id", NULL);
+        }
+    }
+
+  uid_t uid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "User", default_container_uid), 0);
+  gid_t gid = MAX (quad_unit_file_lookup_int (container, CONTAINER_GROUP, "Group", default_container_gid), 0);
 
   uid_t host_uid = quad_unit_file_lookup_uid (container,CONTAINER_GROUP, "HostUser", uid, error);
   if (host_uid == (uid_t)-1)
@@ -387,16 +406,20 @@ convert_container (QuadUnitFile *container, GError **error)
   if (host_gid == (gid_t)-1)
     return NULL;
 
-  if (uid != 0 || gid != 0)
+  if (uid != default_container_uid || gid != default_container_uid)
     {
       quad_podman_add (podman, "--user");
-      if (gid == 0)
+      if (gid == default_container_gid)
         quad_podman_addf (podman, "%lu", (long unsigned)uid);
       else
         quad_podman_addf (podman, "%lu:%lu", (long unsigned)uid, (long unsigned)gid);
     }
 
   gboolean remap_users = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "RemapUsers", TRUE);
+
+  if (quad_is_user)
+    remap_users = FALSE;
+
   if (!remap_users)
     {
       /* No remapping of users, although we still need maps if the
@@ -725,10 +748,14 @@ main (int argc,
   g_autoptr(GError) error = NULL;
   const char *output_path;
   const char **source_paths;
+  g_autofree char *prgname = NULL;
 
   setlocale (LC_ALL, "");
 
-  g_set_prgname (argv[0]);
+  prgname = g_path_get_basename (argv[0]);
+  g_set_prgname (prgname);
+
+  quad_is_user = strstr (prgname, "user") != NULL;
 
   context = g_option_context_new ("OUTPUTDIR - Generate service files");
   g_option_context_add_main_entries (context, entries, NULL);
@@ -766,7 +793,7 @@ main (int argc,
   if (default_remap_gids == NULL) /* Fall back to built-in default */
     default_remap_gids = quad_ranges_new (QUADLET_FALLBACK_GID_START, QUADLET_FALLBACK_GID_LENGTH);
 
-  source_paths  = quad_get_unit_dirs ();
+  source_paths = quad_get_unit_dirs (quad_is_user);
 
   units = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
   for (guint i = 0; source_paths[i] != NULL; i++)

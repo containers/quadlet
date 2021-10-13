@@ -28,7 +28,7 @@ typedef struct {
   guint32 n_ranges;
 } QuadRanges;
 
-const char **         quad_get_unit_dirs           (void);
+const char **         quad_get_unit_dirs           (gboolean        user);
 char *                quad_replace_extension       (const char     *name,
                                                     const char     *extension,
                                                     const char     *extra_prefix,
