@@ -383,15 +383,19 @@ convert_container (QuadUnitFile *container, GError **error)
   uid_t default_container_uid = 0;
   gid_t default_container_gid = 0;
 
-  gboolean keep_id = FALSE;
-  if (quad_is_user)
+  gboolean keep_id = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "KeepId", FALSE);
+  if (keep_id)
     {
-      keep_id = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "KeepId", FALSE);
-      if (keep_id)
+      if (quad_is_user)
         {
           default_container_uid = getuid ();
           default_container_gid = getgid ();
           quad_podman_addv (podman, "--userns", "keep-id", NULL);
+        }
+      else
+        {
+          keep_id = FALSE;
+          quad_log ("Key 'KeepId' in '%s' unsupported for system units, ignoring", quad_unit_file_get_path (container));
         }
     }
 
