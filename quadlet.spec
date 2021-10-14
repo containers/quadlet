@@ -1,5 +1,5 @@
 Name:           quadlet
-Version:        0.2.0
+Version:        0.2.1
 Release:        1%{?dist}
 Summary:        Systemd container integration tool
 
@@ -47,7 +47,9 @@ exit 0
 %doc README.md
 %doc docs/Fileformat.md
 %doc docs/ContainerSetup.md
-%_prefix/lib/systemd/system-generators/quadlet-generator
+%{_libexecdir}/quadlet-generator
+%_prefix/lib/systemd/system-generators/quadlet-system-generator
+%_prefix/lib/systemd/user-generators/quadlet-user-generator
 
 %changelog
 * Mon Sep 27 2021 Alexander Larsson <alexl@redhat.com> - 0.1.0-1
