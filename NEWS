@@ -1,0 +1,6 @@
+Changes in 0.2.1
+~~~~~~~~~~~~~~~~~
+Released: 2021-10-14
+
+* Added support for systemd --user services.
+* Set PODMAN_SYSTEMD_UNIT in the podman env, enabling podman auto-update support.
