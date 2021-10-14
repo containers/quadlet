@@ -14,6 +14,7 @@ BuildRequires:  pkgconfig(gobject-2.0)
 
 Requires(pre):  /usr/sbin/useradd
 Requires:       podman
+Requires:       crun
 
 %description
 Quadlet is an opinionated tool for easily running podman system containers under systemd in an optimal way.
