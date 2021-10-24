@@ -103,7 +103,7 @@ Supported keys in `Container` group are:
 
   If enabled (which is the default) this disables the container
   processes from gaining additional privileges via things like
-  setuid and file capabilieities.
+  setuid and file capabilities.
 
 * `DropCapability=` (defaults to `all`)
 
