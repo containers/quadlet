@@ -4,7 +4,7 @@ Quadlet tries to run containers in a way that efficiently interacts
 with systemd and the rest of the host. It also tries to set up the
 container in a way that defaults to being safe, and as similar to a
 host system as possible. This makes sense, because services running
-under quadlet (as opposed to to a cloud orchestrator) is likely to be
+under quadlet (as opposed to to a cloud orchestrator) are likely to be
 system services, rather than completely isolated network services.
 
 # CGroup setup
@@ -204,7 +204,7 @@ Here are some things that are set up:
 # Uid/Gid mapping
 
 System serices typically run as a single user, ideally not root. For
-containers the situation is a bit more complex as thee uids inside the
+containers the situation is a bit more complex as the uids inside the
 container can be different than the ones on the host. This mapping has
 two sides, first of all the kernel user namespaces can map the
 (dynamic) uids for the running processes so that they are different
@@ -223,8 +223,7 @@ directly to the container.
 
 Due to the above 0-to-0 mapping, the recommended approach is to
 construct container images that run as a standardized *non-root* user,
-and specify that user with `User=that_uid`. If needed you can then you
-can allocate the real uid dynamic on the host and specify it using
+and specify that user with `User=that_uid`. If needed you can then allocate the real uid dynamic on the host and specify it using
 `HostUser`. It is possible to specify a root User, but this will cause
 a larger remapping layer so it is not recommended. If a particular
 permission is required, instead use `AddCapabiltity`.
