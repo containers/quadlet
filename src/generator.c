@@ -211,7 +211,7 @@ add_id_maps (QuadPodman *podman,
 static gboolean
 is_port_range (const char *port)
 {
-  return g_regex_match_simple ("\\d+(-\\d+)?$", port, G_REGEX_DOLLAR_ENDONLY, G_REGEX_MATCH_ANCHORED);
+  return g_regex_match_simple ("\\d+(-\\d+)?(/udp|/tcp)?$", port, G_REGEX_DOLLAR_ENDONLY, G_REGEX_MATCH_ANCHORED);
 }
 
 static QuadUnitFile *
