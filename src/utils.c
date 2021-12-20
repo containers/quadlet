@@ -494,10 +494,12 @@ extract_first_word (const char **p, char **ret, const char *separators, QuadSpli
   return 1;
 }
 
-GPtrArray *
-quad_split_string (const char *s, const char *separators, QuadSplitFlags flags)
+void
+quad_split_string_append (GPtrArray *array,
+                          const char *s,
+                          const char *separators,
+                          QuadSplitFlags flags)
 {
-  g_autoptr(GPtrArray) l = g_ptr_array_new_with_free_func (g_free);
   int r;
 
   for (;;)
@@ -511,9 +513,15 @@ quad_split_string (const char *s, const char *separators, QuadSplitFlags flags)
       if (r == 0)
         break;
 
-      g_ptr_array_add (l, g_steal_pointer (&word));
+      g_ptr_array_add (array, g_steal_pointer (&word));
     }
+}
 
+GPtrArray *
+quad_split_string (const char *s, const char *separators, QuadSplitFlags flags)
+{
+  g_autoptr(GPtrArray) l = g_ptr_array_new_with_free_func (g_free);
+  quad_split_string_append (l, s, separators, flags);
   return g_steal_pointer (&l);
 }
 
