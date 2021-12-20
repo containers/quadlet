@@ -1091,3 +1091,50 @@ quad_ranges_merge (QuadRanges *ranges,
   for (guint32 i = 0; i < other->n_ranges; i++)
     quad_ranges_add (ranges, other->ranges[i].start, other->ranges[i].length);
 }
+
+/* This function normalizes relative the paths by dropping multiple slashes,
+ * removing "." elements and making ".." drop the parent element as long
+ * as there is not (otherwise the .. is just removed). Symlinks are not
+ * handled in any way.
+ */
+char *
+canonicalize_relative_path (const char *filename)
+{
+  g_autoptr(GPtrArray) elements = g_ptr_array_new_with_free_func (g_free);
+  const char *element, *p;
+  gsize len;
+
+  p = filename;
+
+  while (*p != 0)
+    {
+      /* Ignore initial or separator slashes */
+      while (*p == '/')
+        p++;
+
+      /* Start of element */
+      element = p;
+
+      /* Find end of element */
+      while (*p != '/' && *p != 0)
+        p++;
+
+      len = p - element;
+
+      if (len == 0 || (len == 1 && element[0] == '.'))
+        {
+          /* empty or "." element => ignore */
+        }
+      else if (len == 2 && element[0] == '.' && element[1] == '.')
+        {
+          if (elements->len > 0)
+            g_ptr_array_set_size (elements, elements->len - 1);
+        }
+      else
+        g_ptr_array_add (elements, g_strndup (element, len));
+    }
+
+  g_ptr_array_add (elements, NULL);
+
+  return g_strjoinv ("/", (char **)elements->pdata);
+}
