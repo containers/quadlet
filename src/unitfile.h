@@ -67,6 +67,9 @@ const char ** quad_unit_file_lookup_all_raw  (QuadUnitFile  *self,
 char **       quad_unit_file_lookup_all      (QuadUnitFile  *self,
                                               const char    *group_name,
                                               const char    *key);
+char **       quad_unit_file_lookup_all_strv (QuadUnitFile  *self,
+                                              const char    *group_name,
+                                              const char    *key);
 gboolean      quad_unit_file_has_group       (QuadUnitFile  *self,
                                               const char    *group_name);
 const char ** quad_unit_file_list_groups     (QuadUnitFile  *self);

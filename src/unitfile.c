@@ -807,6 +807,23 @@ quad_unit_file_lookup_all (QuadUnitFile *self,
   return res;
 }
 
+/* this splits space separated values similar to the systemd config_parse_strv, merging multiple values into a single vector */
+char **
+quad_unit_file_lookup_all_strv (QuadUnitFile *self,
+                                const char *group_name,
+                                const char *key)
+{
+  g_autoptr(GPtrArray) res = g_ptr_array_new_with_free_func (g_free);
+
+  g_auto(GStrv) values = quad_unit_file_lookup_all (self, group_name, key);
+  for (guint i = 0; values[i] != NULL; i++)
+    quad_split_string_append (res, values[i], WHITESPACE,
+                              QUAD_SPLIT_RETAIN_ESCAPE|QUAD_SPLIT_UNQUOTE);
+
+  g_ptr_array_add (res, NULL);
+  return (const char **)g_ptr_array_free (g_steal_pointer (&res), FALSE);
+}
+
 gboolean
 quad_unit_file_has_group (QuadUnitFile  *self,
                           const char    *group_name)
