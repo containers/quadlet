@@ -58,6 +58,8 @@ gid_t                 quad_lookup_host_gid         (const char *group,
 QuadRanges *          quad_lookup_host_subuid      (const char *user);
 QuadRanges *          quad_lookup_host_subgid      (const char *user);
 
+char *                canonicalize_relative_path   (const char *filename);
+
 QuadRanges *quad_ranges_new (guint32 start,
                              guint32 length);
 QuadRanges *quad_ranges_new_empty (void);
