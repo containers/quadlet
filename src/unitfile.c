@@ -821,7 +821,7 @@ quad_unit_file_lookup_all_strv (QuadUnitFile *self,
                               QUAD_SPLIT_RETAIN_ESCAPE|QUAD_SPLIT_UNQUOTE);
 
   g_ptr_array_add (res, NULL);
-  return (const char **)g_ptr_array_free (g_steal_pointer (&res), FALSE);
+  return (char **)g_ptr_array_free (g_steal_pointer (&res), FALSE);
 }
 
 gboolean
