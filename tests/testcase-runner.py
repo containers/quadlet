@@ -125,6 +125,22 @@ class Testcase:
             last_value = real_values[len(real_values)-1]
             return value in last_value
 
+        def assert_symlink(args, testcase):
+            if len(args) != 2:
+                return False
+            symlink = args[0]
+            expected_target = args[1]
+
+            self.expect_file(symlink)
+
+            p = os.path.join (outdir, symlink)
+            if not os.path.islink(p):
+                return False
+
+            target = os.readlink(p)
+            return target == expected_target
+
+
         ops = {
             "assert-failed": assert_failed,
             "assert-stderr-contains": assert_stderr_contains,
@@ -132,6 +148,7 @@ class Testcase:
             "assert-key-contains": assert_key_contains,
             "assert-podman-args": assert_podman_args,
             "assert-podman-final-args": assert_podman_final_args,
+            "assert-symlink": assert_symlink,
         }
 
         servicepath = os.path.join(outdir, self.servicename)
