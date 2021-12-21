@@ -66,9 +66,30 @@ class Testcase:
         self.outdata = ""
         self.unit = {}
         self.podman_args = []
+        self.expected_files = set()
 
     def lookup(self, group, key):
         return self.sections.get(group, {}).get(key, None)
+
+    def expect_file(self, path):
+        self.expected_files.add(path)
+        path = os.path.dirname(path)
+        while path:
+            self.expected_files.add(path + "/")
+            path = os.path.dirname(path)
+
+    def listfiles(self, outdir):
+        res = list()
+        for root, subdirs, files in os.walk(outdir):
+            prefix = os.path.relpath(root, outdir)
+            if prefix != ".":
+                res.append(prefix + "/")
+            for f in files:
+                if prefix == ".":
+                    res.append(f)
+                else:
+                    res.append(os.path.join(prefix, f))
+        return res
 
     def check(self, outdir):
         def assert_failed(args, testcase):
@@ -125,6 +146,7 @@ class Testcase:
         self.outdata = read_file(outdir, self.servicename)
         self.sections = parse_unitfile(canonicalize_unitfile(self.outdata))
         self.podman_args = shlex.split(self.sections.get("Service", {}).get("ExecStart", ["podman"])[0])
+        self.expect_file(self.servicename)
 
         for check in self.checks:
             op = check[0]
@@ -140,6 +162,12 @@ class Testcase:
                 ok = not ok
             if not ok:
                 testcase.fail(shlex.join(check))
+
+        files = self.listfiles(outdir)
+        for f in self.expected_files:
+            files.remove(f)
+        if len(files) != 0:
+            self.fail(f"Unexpected files in output directory: " + str(files))
 
     def run(self):
         res = None
