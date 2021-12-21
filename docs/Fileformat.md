@@ -32,6 +32,26 @@ in `$XDG_CONFIG_HOME/containers/systemd` (default is
 services. These work more or less the same as the regular system
 units, with some exceptions when it comes to uid mappings (see below).
 
+# Enabling unit files
+
+The service files created by quadlet are considered "generated" by
+systemd, so they don't have the same persistance rules as regular unit
+files. In particular, it is not possible to "systemctl enable" them in
+order for them to become automatically enabled on the next boot.
+
+To compensate for this, the generator manually applies the `[Install]`
+section of the container definition unit files during generation, in
+the same way `systemctl enable` would do when run later.
+
+For example, to start a container on boot, you can do something like:
+
+```
+[Install]
+WantedBy=multi-user.target
+```
+
+Currently only the `Alias`, `WantedBy` and `RequiredBy` keys are supported.
+
 # Container files
 
 Container files are named with a `.container` extension and contain a
