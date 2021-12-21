@@ -37,7 +37,7 @@ char *                quad_apply_line_continuation (const char     *raw_string);
 GPtrArray *           quad_split_string            (const char     *s,
                                                     const char     *separators,
                                                     QuadSplitFlags  flags);
-void                  quad_split_string_append     (GPtrArray      *array,
+gboolean              quad_split_string_append     (GPtrArray      *array,
                                                     const char     *s,
                                                     const char     *separators,
                                                     QuadSplitFlags  flags);

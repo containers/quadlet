@@ -494,7 +494,7 @@ extract_first_word (const char **p, char **ret, const char *separators, QuadSpli
   return 1;
 }
 
-void
+gboolean
 quad_split_string_append (GPtrArray *array,
                           const char *s,
                           const char *separators,
@@ -508,13 +508,15 @@ quad_split_string_append (GPtrArray *array,
 
       r = extract_first_word (&s, &word, separators, flags);
       if (r < 0)
-        return NULL;
+        return FALSE;
 
       if (r == 0)
         break;
 
       g_ptr_array_add (array, g_steal_pointer (&word));
     }
+
+  return TRUE;
 }
 
 GPtrArray *
