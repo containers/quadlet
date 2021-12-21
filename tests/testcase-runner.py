@@ -70,6 +70,77 @@ class Testcase:
     def lookup(self, group, key):
         return self.sections.get(group, {}).get(key, None)
 
+    def check(self, outdir):
+        def assert_failed(args, testcase):
+            return True # We already handled this specially after running
+
+        def assert_stderr_contains(args, testcase):
+            return args[0] in testcase.stdout
+
+        def assert_podman_args(args, testcase):
+            return find_sublist(testcase.podman_args, args) != -1
+
+        def assert_podman_final_args(args, testcase):
+            return match_sublist_at(testcase.podman_args, len(testcase.podman_args) - len(args), args)
+
+        def assert_key_is(args, testcase):
+            if len(args) < 3:
+                return False
+            group = args[0]
+            key = args[1]
+            values = args[2:]
+
+            real_values = testcase.lookup(group, key)
+            return real_values == values
+
+        def assert_key_contains(args, testcase):
+            if len(args) != 3:
+                return False
+            group = args[0]
+            key = args[1]
+            value = args[2]
+
+            real_values = testcase.lookup(group, key)
+            last_value = real_values[len(real_values)-1]
+            return value in last_value
+
+        ops = {
+            "assert-failed": assert_failed,
+            "assert-stderr-contains": assert_stderr_contains,
+            "assert-key-is": assert_key_is,
+            "assert-key-contains": assert_key_contains,
+            "assert-podman-args": assert_podman_args,
+            "assert-podman-final-args": assert_podman_final_args,
+        }
+
+        servicepath = os.path.join(outdir, self.servicename)
+        if self.expect_fail:
+            if os.path.isfile(servicepath):
+                self.fail("Unexpected success")
+            return # Successfully failed checks done
+
+        if not os.path.isfile(servicepath):
+            self.fail(f"Unexpected failure, can't find {servicepath}\n" + self.stdout)
+
+        self.outdata = read_file(outdir, self.servicename)
+        self.sections = parse_unitfile(canonicalize_unitfile(self.outdata))
+        self.podman_args = shlex.split(self.sections.get("Service", {}).get("ExecStart", ["podman"])[0])
+
+        for check in self.checks:
+            op = check[0]
+            args = check[1:]
+            invert = False
+            if op[0] == '!':
+                invert = True;
+                op = op[1:]
+            if not op in ops:
+                testcase.fail(f"unknown assertion {op}");
+            ok = ops[op](args, testcase)
+            if invert:
+                ok = not ok
+            if not ok:
+                testcase.fail(shlex.join(check))
+
     def run(self):
         res = None
         outdata = {}
@@ -91,16 +162,8 @@ class Testcase:
             if res.returncode != 0:
                 self.fail(f"Unexpected generator failure\n" + self.stdout)
 
-            servicepath = os.path.join(outdir, self.servicename)
-            if self.expect_fail:
-                if os.path.isfile(servicepath):
-                    self.fail("Unexpected success")
-            else:
-                if not os.path.isfile(servicepath):
-                    self.fail(f"Unexpected failure, can't find {servicepath}\n" + self.stdout)
-                self.outdata = read_file(outdir, self.servicename)
-                self.sections = parse_unitfile(canonicalize_unitfile(self.outdata))
-                self.podman_args = shlex.split(self.sections.get("Service", {}).get("ExecStart", ["podman"])[0])
+            testcase.check(outdir)
+
 
     def fail(self, msg):
         print(f"Failed testcase {self.filename}: {msg}")
@@ -140,48 +203,6 @@ def parse_unitfile(data):
             sections[section][key].append(val)
     return sections
 
-def assert_failed(args, testcase):
-    return True # We already handled this specially after running
-
-def assert_stderr_contains(args, testcase):
-    return args[0] in testcase.stdout
-
-def assert_podman_args(args, testcase):
-    return find_sublist(testcase.podman_args, args) != -1
-
-def assert_podman_final_args(args, testcase):
-    return match_sublist_at(testcase.podman_args, len(testcase.podman_args) - len(args), args)
-
-def assert_key_is(args, testcase):
-    if len(args) < 3:
-        return False
-    group = args[0]
-    key = args[1]
-    values = args[2:]
-
-    real_values = testcase.lookup(group, key)
-    return real_values == values
-
-def assert_key_contains(args, testcase):
-    if len(args) != 3:
-        return False
-    group = args[0]
-    key = args[1]
-    value = args[2]
-
-    real_values = testcase.lookup(group, key)
-    last_value = real_values[len(real_values)-1]
-    return value in last_value
-
-ops = {
-    "assert-failed": assert_failed,
-    "assert-stderr-contains": assert_stderr_contains,
-    "assert-key-is": assert_key_is,
-    "assert-key-contains": assert_key_contains,
-    "assert-podman-args": assert_podman_args,
-    "assert-podman-final-args": assert_podman_final_args,
-}
-
 if len(sys.argv) < 2:
     print("No dir arg given", file=sys.stderr)
     sys.exit(1)
@@ -209,18 +230,3 @@ for testcase in testcases:
         in_valgrind = " (in valgrind)"
     print (f"Running testcase {testcase.filename}{in_valgrind}")
     testcase.run()
-
-    for check in testcase.checks:
-        op = check[0]
-        args = check[1:]
-        invert = False
-        if op[0] == '!':
-            invert = True;
-            op = op[1:]
-        if not op in ops:
-            testcase.fail(f"unknown assertion {op}");
-        ok = ops[op](args, testcase)
-        if invert:
-            ok = not ok
-        if not ok:
-            testcase.fail(shlex.join(check))
