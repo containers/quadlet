@@ -52,6 +52,11 @@ WantedBy=multi-user.target
 
 Currently only the `Alias`, `WantedBy` and `RequiredBy` keys are supported.
 
+NOTE: If you want to express dependencies between containers you need
+to use the generated names of the service. In other words
+`WantedBy=other.service`, not `WantedBy=other.container`. The same is
+true for other kinds of dependencies too, like `After=other.service`.
+
 # Container files
 
 Container files are named with a `.container` extension and contain a
