@@ -26,7 +26,7 @@ to the generated systemd service file, so can contain any normal
 systemd configuration. The custom section is also visible in the
 generated file, but with a `X-` prefix which means systemd ignores it.
 
-Quadlet also supports `systemd --user` unit. Any quadlet files stored
+Quadlet also supports `systemd --user` units. Any quadlet files stored
 in `$XDG_CONFIG_HOME/containers/systemd` (default is
 `~/.config/containers/systemd`) will be converted to user systemd
 services. These work more or less the same as the regular system
@@ -35,7 +35,7 @@ units, with some exceptions when it comes to uid mappings (see below).
 # Enabling unit files
 
 The service files created by quadlet are considered "generated" by
-systemd, so they don't have the same persistance rules as regular unit
+systemd, so they don't have the same persistence rules as regular unit
 files. In particular, it is not possible to "systemctl enable" them in
 order for them to become automatically enabled on the next boot.
 
@@ -63,7 +63,7 @@ Container files are named with a `.container` extension and contain a
 section `[Container]` describing the container that should be run as a
 service. The resulting service file will contain a line like
 `ExecStart=podman run … image-name`, and most of the keys in this
-section control the commandline options passed to podman.  However,
+section control the command-line options passed to podman.  However,
 some options also affect details of how systemd is set up to run and
 interact with the container.
 
@@ -141,7 +141,7 @@ Supported keys in `Container` group are:
 
    By default the container runs with no capabilities (due to
    DropCapabilities='all'), if any specific caps are needed you can
-   list add them with this key. For example using
+   add them with this key. For example using
    `AddCapability=CAP_DAC_OVERRIDE`. This can be listed multiple
    times.
 
@@ -285,7 +285,7 @@ Supported keys in `Container` group are:
 # Volume files
 
 Volume files are named with a `.volume` extension and contain a
-section `[Volume]` describing ta named podman volume. The generated
+section `[Volume]` describing the named podman volume. The generated
 service is a one-time command that ensures that the volume exists on
 the host, creating it if needed.
 
@@ -293,7 +293,7 @@ For a volume file named `$NAME.volume`, the generated podman volume
 will be called `systemd-$NAME`, and the generated service file
 `$NAME-volume.service`.
 
-Using volume units allows containers to depends on volumes being
+Using volume units allows containers to depend on volumes being
 automatically pre-created. This is particularly interesting if you
 need to specify special options to volume creation, as podman will
 otherwise create unknown volumes with the default options.
