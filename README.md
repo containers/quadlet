@@ -10,7 +10,7 @@ in combination with an orchestrator like Kubernetes. They are also
 commonly used during development and testing to manually manage
 containers on an ad-hoc basis.
 
-However, there are also usecases where you want some kind of automatic
+However, there are also use cases where you want some kind of automatic
 container management, but on a smaller, single-node scale, and often
 more tightly integrated with the rest of the system. Typical examples
 of this can be embedded or automotive use, where there is no system
@@ -25,7 +25,7 @@ files. And often the container setup isn't optimal.
 
 With quadlet, you describe how to run a container in a format that is
 very similar to regular systemd config files. From these actual
-systemd configuration are automatically generated (using [systemd
+systemd configurations are automatically generated (using [systemd
 generators](https://www.freedesktop.org/software/systemd/man/systemd.generator.html)).
 
 The container descriptions focus on the relevant container details,

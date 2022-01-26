@@ -14,7 +14,7 @@ in the container. This means that the cgroups of the container must
 be beneath the cgroup that systemd creates. This is achieved by using
 the crun container runtime with the split cgroups feature.
 
-With a traditional podman setup the cgroup hieararchy looks like this:
+With a traditional podman setup the cgroup hierarchy looks like this:
 
 ```
 ├─system.slice
@@ -50,11 +50,11 @@ One issue with using systemd to manage the service is that there is a
 risk for container shutdowns to become unclean, leaving around
 leftover container state. Podman doesn't have a centralized daemon
 like docker that keeps track of what is running. However, there is
-still global state that can be accessed with things like `podman ps`
+still a global state that can be accessed with things like `podman ps`
 or `podman inspect`. This global state is managed by the `conman`
 process that monitors each container. It tracks the container
 subprocess and when it dies it runs some cleanup code in an atexit()
-handler that update the global state wrt to the container not living.
+handler that updates the global state wrt to the container not living.
 
 In the normal case this is not a problem, but if systemd has to force
 kill everything in the cgroup this can lead to problems, like multiple
@@ -120,13 +120,13 @@ processes in the container, not just the main one.
 # Logging
 
 With podman the container stdout is a pipe set up by conmon which
-collects all the logged info and redirects its to the global podman
+collects all the logged info and redirects it to the global podman
 logs (available via `podman logs`). It is also possible to use `podman
 attach` or `podman run -ti` to get at the output. This contacts the
 conman process and asks to get copied on the output.
 
-For systemd services we are primarily interested with getting the logs
-into the systemd journal. For this quadlet uses `--log-driver journal`
+For systemd services we are primarily interested in getting the logs
+into the systemd journal. For this quadlet uses `--log-driver journald`
 which causes conmon to send the logs to the journal.
 
 Unfortunately this is still not ideal, as it causes an extra copy of
@@ -142,7 +142,7 @@ development](https://github.com/containers/podman/pull/11390).
 We expect system containers to be more like linux system code than
 typical web-server containers, so we want to ensure that the runtime
 environment in the container is similar to that of a normal systemd
-service. We also want quadlet containers look the same when viewed
+service. We also want quadlet containers to look the same when viewed
 from the podman side.
 
 Here are some things that are set up:
@@ -163,7 +163,7 @@ Here are some things that are set up:
   This adds a minimal pid1 babysitter process for the container that
   reaps zombied children. This is necessary because most programs are
   not programmed to reap the child processes they launch, instead
-  relying on pid 1 to do this. But when run as pid 1 of in container
+  relying on pid 1 to do this. But when run as pid 1 in the container
   there is no other reaper around. This can be overridden with
   `RunInit=no`.
 
@@ -174,7 +174,7 @@ Here are some things that are set up:
 
 * `--tz=local`
 
-  This sets the timezone of the container to match whatever the host os
+  This sets the timezone of the container to match whatever the host OS
   uses. For distributed host-isolated services it makes sense to always
   run in UTC, but for a system service we want to be as close as
   possible to the host. This can be overridden with `Timnezone=`.
@@ -195,7 +195,7 @@ Here are some things that are set up:
 
 * `--security-opt=no-new-privileges`
 
-  Generally services run only as one user and need not special permissions.
+  Generally services run only as one user and need no special permissions.
   This disables all forms of setuid like features that allows the process to
   gain privileges it didn't initially have. Unless the app has very specific
   needs this is a good default for security reasons.
@@ -203,7 +203,7 @@ Here are some things that are set up:
 
 # Uid/Gid mapping
 
-System serices typically run as a single user, ideally not root. For
+System services typically run as a single user, ideally not root. For
 containers the situation is a bit more complex as the uids inside the
 container can be different than the ones on the host. This mapping has
 two sides, first of all the kernel user namespaces can map the
@@ -213,7 +213,7 @@ the container image files on disk. This is handled by podman creating
 an extra layer on disk for each specific mapping.
 
 The user namespace mapping is essentially free, but the file ownership
-mapping takes both time and diskspace. For this reason, and because
+mapping takes both time and disk space. For this reason, and because
 most container files are owned by root, quadlet defaults to mapping
 host uid 0 to 0 in the container, making the ownership mapping layers
 small. Due to the limited permissions quadlet defaults to, mapping the
