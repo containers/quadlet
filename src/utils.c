@@ -538,8 +538,7 @@ char_need_escape (gunichar c)
     g_ascii_isspace (c) ||
     c == '"' ||
     c == '\'' ||
-    c == '\\' ||
-    c == ';';
+    c == '\\';
 }
 
 
@@ -570,6 +569,12 @@ append_escape_word (GString *escaped,
         {
           switch (c)
             {
+            case '\a':
+              g_string_append (escaped, "\\a");
+              break;
+            case '\b':
+              g_string_append (escaped, "\\b");
+              break;
             case '\n':
               g_string_append (escaped, "\\n");
               break;
@@ -577,7 +582,10 @@ append_escape_word (GString *escaped,
               g_string_append (escaped, "\\r");
               break;
             case '\t':
-              g_string_append (escaped, "\t");
+              g_string_append (escaped, "\\t");
+              break;
+            case '\v':
+              g_string_append (escaped, "\\v");
               break;
             case '\f':
               g_string_append (escaped, "\\f");
@@ -585,14 +593,11 @@ append_escape_word (GString *escaped,
             case '\\':
               g_string_append (escaped, "\\\\");
               break;
-            case ';':
-              g_string_append (escaped, "\\;");
-              break;
             case ' ':
               g_string_append (escaped, " ");
               break;
             case '"':
-              g_string_append (escaped, "\"");
+              g_string_append (escaped, "\\\"");
               break;
             case '\'':
               g_string_append (escaped, "'");
