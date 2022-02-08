@@ -5,7 +5,7 @@ Summary:        Systemd container integration tool
 
 License:        GPLv2+
 URL:            https://github.com/containers/quadlet
-Source0:        %{url}/archive/%{version}/%{name}-%{version}.tar.gz
+Source0:        %{url}/archive/%{version}/%{name}-%{version}.tar.xz
 
 BuildRequires:  meson
 BuildRequires:  gcc
