@@ -589,7 +589,7 @@ convert_container (QuadUnitFile *container, GError **error)
     {
       char *podman_args_s = podman_argsv[i];
       g_autoptr(GPtrArray) podman_args = quad_split_string (podman_args_s, WHITESPACE,
-                                                            QUAD_SPLIT_RELAX|QUAD_SPLIT_UNQUOTE);
+                                                            QUAD_SPLIT_RELAX|QUAD_SPLIT_UNQUOTE|QUAD_SPLIT_CUNESCAPE);
       quad_podman_add_array (podman, (const char **)podman_args->pdata, podman_args->len);
     }
 
@@ -599,7 +599,7 @@ convert_container (QuadUnitFile *container, GError **error)
   if (exec_key != NULL)
     {
       g_autoptr(GPtrArray) exec_args = quad_split_string (exec_key, WHITESPACE,
-                                                          QUAD_SPLIT_RELAX|QUAD_SPLIT_UNQUOTE);
+                                                          QUAD_SPLIT_RELAX|QUAD_SPLIT_UNQUOTE|QUAD_SPLIT_CUNESCAPE);
       quad_podman_add_array (podman, (const char **)exec_args->pdata, exec_args->len);
     }
 
