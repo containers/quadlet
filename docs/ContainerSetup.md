@@ -172,13 +172,6 @@ Here are some things that are set up:
   This makes /tmp in the container be a tmpfs, similar to how it is set
   up on the host. This can be overridden with `VolatileTmp=no`.
 
-* `--tz=local`
-
-  This sets the timezone of the container to match whatever the host OS
-  uses. For distributed host-isolated services it makes sense to always
-  run in UTC, but for a system service we want to be as close as
-  possible to the host. This can be overridden with `Timnezone=`.
-
 * `--pull=never`
 
   Never pull the image during service start. If the image is missing this
