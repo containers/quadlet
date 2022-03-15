@@ -308,10 +308,7 @@ convert_container (QuadUnitFile *container, GError **error)
                     NULL);
 
   g_autofree char *timezone =  quad_unit_file_lookup (container, CONTAINER_GROUP, "Timezone");
-  /* Use the host timezone by default*/
-  if (timezone == NULL)
-    timezone = g_strdup ("local");
-  if (*timezone != 0)
+  if (timezone != NULL && *timezone != 0)
     quad_podman_addf (podman, "--tz=%s", timezone);
 
   /* Run with a pid1 init to reap zombies by default (as most apps don't do that) */
