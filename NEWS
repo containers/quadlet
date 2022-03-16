@@ -1,3 +1,22 @@
+Changes in 0.2.4
+~~~~~~~~~~~~~~~~~
+Released: 2022-03-16
+
+* Drop custom `local` default for timezone, now uses system configured
+  default.
+
+Changes in 0.2.3
+~~~~~~~~~~~~~~~~~
+Released: 2022-02-08
+
+* Fix handling of escape and quote in Exec and PodmanArgs keys.
+
+Changes in 0.2.2
+~~~~~~~~~~~~~~~~~
+Released: 2021-12-21
+
+* Support enabling services at boot, using the Install section.
+
 Changes in 0.2.1
 ~~~~~~~~~~~~~~~~~
 Released: 2021-10-14
