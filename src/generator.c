@@ -517,11 +517,17 @@ convert_container (QuadUnitFile *container, GError **error)
   g_auto(GStrv) publish_ports = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "PublishPort");
   for (guint i = 0; publish_ports[i] != NULL; i++)
     {
-      char *publish_port = g_strchomp (publish_ports[i]); /* Allow whitespace after */
-      g_auto(GStrv) parts = g_strsplit (publish_port, ":", -1);
+      char *publish_port = g_strstrip (publish_ports[i]); /* Allow whitespaces before and after */
+      /* IP address could have colons in it. For example: "[::]:8080:80/tcp, so use custom splitter */
+      g_auto(GStrv) parts = quad_split_ports (publish_port);
       const char *container_port = NULL, *ip = NULL, *host_port = NULL;
 
-      /* format (from podman run): ip:hostPort:containerPort | ip::containerPort | hostPort:containerPort | containerPort */
+      /* format (from podman run):
+       * ip:hostPort:containerPort | ip::containerPort | hostPort:containerPort | containerPort
+       *
+       * ip could be IPv6 with minimum of these chars "[::]"
+       * containerPort can have a suffix of "/tcp" or "/udp"
+       */
 
       switch (g_strv_length (parts))
         {
