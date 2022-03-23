@@ -248,7 +248,7 @@ Supported keys in `Container` group are:
   host and container ports must be the same (in case of a range).
 
   If the IP is set to 0.0.0.0 or not set at all, the port will be
-  bound on all IPs on the host.
+  bound on all IPv4 addresses on the host, use [::] for IPv6.
 
   Note that not listing a host port means that podman will
   automatically select one, and it may be different for each
