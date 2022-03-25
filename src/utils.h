@@ -41,6 +41,7 @@ gboolean              quad_split_string_append     (GPtrArray      *array,
                                                     const char     *s,
                                                     const char     *separators,
                                                     QuadSplitFlags  flags);
+char **               quad_split_ports             (const char     *ports);
 char *                quad_escape_words            (GPtrArray      *words);
 
 gboolean              quad_fail                    (GError **error,
