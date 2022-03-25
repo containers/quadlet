@@ -340,6 +340,68 @@ test_range_remove (void)
     }
 }
 
+static void
+test_split_ports (void)
+{
+  {
+    g_auto(GStrv) parts = quad_split_ports ("");
+
+    g_assert (g_strv_length (parts) == 1);
+    g_assert_cmpstr (parts[0], ==, "");
+  }
+
+  {
+    g_auto(GStrv) parts = quad_split_ports ("foo");
+
+    g_assert (g_strv_length (parts) == 1);
+    g_assert_cmpstr (parts[0], ==, "foo");
+  }
+
+  {
+    g_auto(GStrv) parts = quad_split_ports ("foo:bar");
+
+    g_assert (g_strv_length (parts) == 2);
+    g_assert_cmpstr (parts[0], ==, "foo");
+    g_assert_cmpstr (parts[1], ==, "bar");
+  }
+
+  {
+    g_auto(GStrv) parts = quad_split_ports ("foo:bar:");
+
+    g_assert (g_strv_length (parts) == 3);
+    g_assert_cmpstr (parts[0], ==, "foo");
+    g_assert_cmpstr (parts[1], ==, "bar");
+    g_assert_cmpstr (parts[2], ==, "");
+  }
+
+  {
+    g_auto(GStrv) parts = quad_split_ports ("abc[foo::bar]xyz:foo:bar");
+
+    g_assert (g_strv_length (parts) == 3);
+    g_assert_cmpstr (parts[0], ==, "abc[foo::bar]xyz");
+    g_assert_cmpstr (parts[1], ==, "foo");
+    g_assert_cmpstr (parts[2], ==, "bar");
+  }
+
+  {
+    g_auto(GStrv) parts = quad_split_ports ("foo:abc[foo::bar]xyz:bar");
+
+    g_assert (g_strv_length (parts) == 3);
+    g_assert_cmpstr (parts[0], ==, "foo");
+    g_assert_cmpstr (parts[1], ==, "abc[foo::bar]xyz");
+    g_assert_cmpstr (parts[2], ==, "bar");
+  }
+
+  {
+    g_auto(GStrv) parts = quad_split_ports ("foo:abc[foo::barxyz:bar");
+
+    g_assert (g_strv_length (parts) == 2);
+    g_assert_cmpstr (parts[0], ==, "foo");
+    g_assert_cmpstr (parts[1], ==, "abc[foo::barxyz:bar");
+  }
+
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -353,6 +415,7 @@ main (int argc, char *argv[])
   g_test_add_func ("/ranges/single", test_range_single);
   g_test_add_func ("/ranges/multi", test_range_multi);
   g_test_add_func ("/ranges/remove", test_range_remove);
+  g_test_add_func ("/split-ports", test_split_ports);
 
   return g_test_run ();
 }

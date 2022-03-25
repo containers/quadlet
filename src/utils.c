@@ -1145,3 +1145,40 @@ canonicalize_relative_path (const char *filename)
 
   return g_strjoinv ("/", (char **)elements->pdata);
 }
+
+/* Split colon separated port list, handling IPV6 addresses */
+char **
+quad_split_ports (const char *ports)
+{
+  GPtrArray *parts = g_ptr_array_new ();
+  const char *start, *end;
+
+  /* IP address could have colons in it. For example: "[::]:8080:80/tcp, so we split carefully */
+  end = start = ports;
+  while (*end != 0)
+    {
+      if (*end == '[')
+        {
+          char *end_bracket = strchr (end, ']');
+          if (end_bracket == NULL)
+            end = end + strlen (end);
+          else
+            end = end_bracket + 1;
+        }
+      else if (*end == ':')
+        {
+          g_ptr_array_add (parts, g_strndup (start, end - start));
+          end++;
+          start = end;
+        }
+      else
+        {
+          end++;
+        }
+    }
+  g_ptr_array_add (parts, g_strndup (start, end - start));
+
+  g_ptr_array_add (parts, NULL);
+
+  return (char **) g_ptr_array_free (parts, FALSE);
+}
