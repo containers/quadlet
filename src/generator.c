@@ -33,7 +33,7 @@ static const char *supported_container_keys[] = {
   "SocketActivated",
   "ExposeHostPort",
   "PublishPort",
-  "KeepUser",
+  "KeepId",
   "User",
   "Group",
   "HostUser",
