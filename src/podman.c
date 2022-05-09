@@ -7,12 +7,19 @@ struct QuadPodman {
   GPtrArray *args;
 };
 
-QuadPodman *quad_podman_new (void)
+QuadPodman *quad_podman_new (const char *command, const char *sub_command)
 {
   QuadPodman *podman = g_new0 (QuadPodman, 1);
 
   podman->args = g_ptr_array_new_with_free_func (g_free);
   quad_podman_add (podman, "/usr/bin/podman");
+
+  if (command)
+    quad_podman_add (podman, command);
+
+  if (sub_command)
+    quad_podman_add (podman, sub_command);
+
   return podman;
 }
 

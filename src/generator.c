@@ -272,9 +272,9 @@ convert_container (QuadUnitFile *container, GError **error)
   quad_unit_file_add (service, SERVICE_GROUP,
                       "ExecStopPost", "-rm -f %t/%N.cid");
 
-  g_autoptr(QuadPodman) podman = quad_podman_new ();
+  g_autoptr(QuadPodman) podman = quad_podman_new ("run", NULL);
 
-  quad_podman_addv (podman, "run",
+  quad_podman_addv (podman,
 
                     /* We want to name the container by the service name */
                     "--name=systemd-%N",
@@ -634,9 +634,7 @@ convert_volume (QuadUnitFile *container,
   g_auto(GStrv) labels = quad_unit_file_lookup_all (container, VOLUME_GROUP, "Label");
   g_autoptr(GHashTable) podman_labels = parse_keys (labels);
 
-  g_autoptr(QuadPodman) podman = quad_podman_new ();
-  quad_podman_addv (podman,
-                    "volume", "create", NULL);
+  g_autoptr(QuadPodman) podman = quad_podman_new ("volume", "create");
 
   g_autoptr(GString) opts = g_string_new ("o=");
 

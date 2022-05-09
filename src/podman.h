@@ -6,7 +6,8 @@ G_BEGIN_DECLS
 
 typedef struct QuadPodman QuadPodman;
 
-QuadPodman *quad_podman_new (void);
+QuadPodman *quad_podman_new (const char *command,
+                             const char *sub_command);
 void        quad_podman_free (QuadPodman *podman);
 void        quad_podman_add (QuadPodman *podman,
                              const char *arg);
