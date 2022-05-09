@@ -18,6 +18,7 @@
 
 
 static const char *supported_container_keys[] = {
+  "ContainerName",
   "Image",
   "Environment",
   "Exec",
@@ -232,6 +233,11 @@ convert_container (QuadUnitFile *container, GError **error)
       return NULL;
     }
 
+  g_autofree char *container_name = quad_unit_file_lookup (container, CONTAINER_GROUP, "ContainerName");
+  if (container_name == NULL || container_name[0] == 0)
+    /* By default, We want to name the container by the service name */
+    container_name = g_strdup ("systemd-%N");
+
   /* Set PODMAN_SYSTEMD_UNIT so that podman auto-update can restart the service. */
   quad_unit_file_add (service, SERVICE_GROUP,
                       "Environment", "PODMAN_SYSTEMD_UNIT=%n");
@@ -274,10 +280,9 @@ convert_container (QuadUnitFile *container, GError **error)
 
   g_autoptr(QuadPodman) podman = quad_podman_new ("run", NULL);
 
-  quad_podman_addv (podman,
+  quad_podman_addf (podman, "--name=%s", container_name);
 
-                    /* We want to name the container by the service name */
-                    "--name=systemd-%N",
+  quad_podman_addv (podman,
 
                     /* We store the container id so we can clean it up in case of failure */
                     "--cidfile=%t/%N.cid",
