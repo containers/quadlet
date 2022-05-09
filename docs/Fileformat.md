@@ -83,6 +83,13 @@ Supported keys in `Container` group are:
    because the generated service file will never try to download
    images.
 
+* `ContainerName=`
+
+   The (optional) name of the podman container. If this is not
+   specified, the default value of `systemd-%N` will be used,
+   which is the same as the service name but with a `systemd-`
+   prefix to avoid conflicts with user-managed containers.
+
 * `Environment=`
 
   Set an environment variable in the container. This uses the same
