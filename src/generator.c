@@ -21,6 +21,7 @@ static const char *supported_container_keys[] = {
   "ContainerName",
   "Image",
   "Environment",
+  "EnvironmentFile",
   "Exec",
   "NoNewPrivileges",
   "DropCapability",
@@ -583,6 +584,12 @@ convert_container (QuadUnitFile *container, GError **error)
     }
 
   quad_podman_add_env (podman, podman_env);
+
+  g_auto(GStrv) env_files = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "EnvironmentFile");
+  for (guint i = 0; env_files[i] != NULL; i++)
+    {
+      quad_podman_addf (podman, "--env-file=%s", env_files[i]);
+    }
 
   g_auto(GStrv) labels = quad_unit_file_lookup_all (container, CONTAINER_GROUP, "Label");
   g_autoptr(GHashTable) podman_labels = parse_keys (labels);
