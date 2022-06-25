@@ -1,0 +1,8 @@
+## assert-podman-final-args imagename
+## assert-podman-args --env-file=foo.env
+## assert-podman-args --env-file=bar.env
+
+[Container]
+Image=imagename
+EnvironmentFile=foo.env
+EnvironmentFile=bar.env

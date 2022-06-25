@@ -96,6 +96,13 @@ Supported keys in `Container` group are:
   format as [services in systemd](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Environment=)
   and can be listed multiple times.
 
+* `EnvironmentFile=`
+
+  Read line delimited file of environment variables into the container. See 
+  [`--env-file`](https://docs.podman.io/en/latest/markdown/podman-run.1.html#env-file-file).
+
+  This can be listed multiple times.
+
 * `Exec=`
 
   If this is set then it defines what commandline to run in the container. If it
