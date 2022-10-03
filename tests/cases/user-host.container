@@ -17,6 +17,8 @@ HostUser=900
 Group=1001
 HostGroup=901
 
+RemapUsers=yes
+
 # Set this to get well-known valuse for the checks
 RemapUidRanges=100000-199999
 RemapGidRanges=100000-199999

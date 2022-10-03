@@ -422,7 +422,7 @@ convert_container (QuadUnitFile *container, GError **error)
         quad_podman_addf (podman, "%lu:%lu", (long unsigned)uid, (long unsigned)gid);
     }
 
-  gboolean remap_users = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "RemapUsers", TRUE);
+  gboolean remap_users = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "RemapUsers", FALSE);
 
   if (quad_is_user)
     remap_users = FALSE;

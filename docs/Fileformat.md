@@ -152,7 +152,7 @@ Supported keys in `Container` group are:
    `AddCapability=CAP_DAC_OVERRIDE`. This can be listed multiple
    times.
 
-* `RemapUsers=` (defaults to `yes` for system units, always `no` on user units)
+* `RemapUsers=` (defaults to `no`)
 
    If this is enabled (which is the default for system units), then
    host user and group ids are remapped in the container, such that
