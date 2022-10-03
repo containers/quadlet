@@ -25,6 +25,7 @@ static const char *supported_container_keys[] = {
   "NoNewPrivileges",
   "DropCapability",
   "AddCapability",
+  "ReadOnly",
   "RemapUsers",
   "RemapUidStart",
   "RemapGidStart",
@@ -365,10 +366,22 @@ convert_container (QuadUnitFile *container, GError **error)
       quad_podman_addf (podman, "--cap-add=%s", caps);
     }
 
+  gboolean read_only = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "ReadOnly", FALSE);
+  if (read_only)
+    quad_podman_add (podman, "--read-only");
+
   /* We want /tmp to be a tmpfs, like on rhel host */
   gboolean volatile_tmp = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "VolatileTmp", TRUE);
   if (volatile_tmp)
-    quad_podman_addv (podman, "--mount", "type=tmpfs,tmpfs-size=512M,destination=/tmp", NULL);
+    {
+      /* Read only mode already has a tmpfs by default */
+      if (!read_only)
+        quad_podman_addv (podman, "--tmpfs", "/tmp:rw,size=512M,mode=1777", NULL);
+    }
+  else if (read_only)
+    {
+      quad_podman_add (podman, "--read-only-tmpfs=false");
+    }
 
   gboolean socket_activated = quad_unit_file_lookup_boolean (container, CONTAINER_GROUP, "SocketActivated", FALSE);
   if (socket_activated)

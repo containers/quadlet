@@ -12,7 +12,7 @@
 ## assert-podman-args "--sdnotify=conmon"
 ## assert-podman-args "--security-opt=no-new-privileges"
 ## assert-podman-args "--cap-drop=all"
-## assert-podman-args "--mount" "type=tmpfs,tmpfs-size=512M,destination=/tmp"
+## assert-podman-args "--tmpfs" "/tmp:rw,size=512M,mode=1777"
 ## assert-key-is "Unit" "RequiresMountsFor" "%t/containers"
 ## assert-key-is "Service" "KillMode" "mixed"
 ## assert-key-is "Service" "Delegate" "yes"

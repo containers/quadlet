@@ -152,6 +152,11 @@ Supported keys in `Container` group are:
    `AddCapability=CAP_DAC_OVERRIDE`. This can be listed multiple
    times.
 
+* `ReadOnly=` (defaults to `no`)
+
+   If enabled, makes image read-only, with /var/tmp, /tmp and /run
+   a tmpfs (unless disabled by `VolatileTmp=no`).
+
 * `RemapUsers=` (defaults to `no`)
 
    If this is enabled (which is the default for system units), then
