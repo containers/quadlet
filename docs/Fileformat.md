@@ -217,7 +217,7 @@ Supported keys in `Container` group are:
    is passed to the container. This is only needed for older versions of podman, since podman
    was [recently made to handle this automatically](https://github.com/containers/podman/pull/11316).
 
-* `Timezone=` (default to `local`)
+* `Timezone=` (if unset uses system-configured default)
 
    The timezone to run the container in.
 
