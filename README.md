@@ -1,3 +1,7 @@
+# Quadlet has been merged into [podman](https://github.com/containers/podman/tree/main/pkg/systemd/quadlet)
+
+This repo is frozen.
+
 # What is Quadlet
 
 Quadlet is an opinionated tool for easily running podman system
